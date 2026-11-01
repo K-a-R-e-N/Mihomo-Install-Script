@@ -28,7 +28,7 @@ sudo apt update && sudo apt install git curl wget -y
 
 ```bash
 git clone https://github.com/K-a-R-e-N/Mihomo-Install-Script
-bash ~/Mihomo-Install-Script/mihomo-setup.sh
+bash ~/Mihomo-Install-Script/Mihomo-setup.sh
 #Готово
 ```
 
@@ -62,5 +62,5 @@ rm -rf ~/Mihomo-Install-Script
 
 ### ДЛЯ ТЕСТОВ, НЕ ОБРАЩАЕМ ВНИМАНИЯ !!!
 ```bash
-sudo rm -rf ~/Mihomo-Install-Script && git clone https://github.com/K-a-R-e-N/Mihomo-Install-Script && bash ~/Mihomo-Install-Script/mihomo-setup.sh
+sudo rm -rf ~/Mihomo-Install-Script && git clone https://github.com/K-a-R-e-N/Mihomo-Install-Script && bash ~/Mihomo-Install-Script/Mihomo-setup.sh
 ```
