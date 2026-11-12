@@ -12,15 +12,6 @@ DM=$'\033[90m'
 RS=$'\033[0m'
 BG=$'\033[30;47m'
 
-# Подсчёт видимой длины строки в символах (независимо от локали):
-# символ = байты ASCII + ведущие байты UTF-8 (кириллица больше не ломает рамки)
-function charlen {
-    local a l
-    a=$(printf '%s' "$1" | LC_ALL=C tr -cd '\000-\177' | wc -c)
-    l=$(printf '%s' "$1" | LC_ALL=C tr -cd '\300-\377' | wc -c)
-    echo $(( a + l ))
-}
-
 REPO_UTIL="https://raw.githubusercontent.com/K-a-R-e-N/Mihomo-Install-Script/main/mihomoutil.sh"
 REPO_API="https://api.github.com/repos/K-a-R-e-N/Mihomo-Install-Script/commits?path=mihomoutil.sh&per_page=1"
 SETUP_API="https://api.github.com/repos/K-a-R-e-N/Mihomo-Install-Script/commits?path=Mihomo-setup.sh&per_page=1"
@@ -69,6 +60,15 @@ function RU2EN {
     printf '%s' "$1" | sed 's|[йЙ]|q|g; s|[цЦ]|w|g; s|[уУ]|e|g; s|[кК]|r|g; s|[еЕ]|t|g; s|[нН]|y|g; s|[гГ]|u|g; s|[шШ]|i|g; s|[щЩ]|o|g; s|[зЗ]|p|g; s|[хХ]|[|g; s|[ъЪ]|]|g; s|[фФ]|a|g; s|[ыЫ]|s|g; s|[вВ]|d|g; s|[аА]|f|g; s|[пП]|g|g; s|[рР]|h|g; s|[оО]|j|g; s|[лЛ]|k|g; s|[дД]|l|g; s|[яЯ]|z|g; s|[чЧ]|x|g; s|[сС]|c|g; s|[мМ]|v|g; s|[иИ]|b|g; s|[тТ]|n|g; s|[ьЬ]|m|g'
 }
 
+function charlen {
+    local s="$1"
+    local LC_ALL=C LANG=C
+    local bytes=${#s}
+    local cont
+    cont=$(printf '%s' "$s" | od -An -tx1 | tr -s ' ' '\n' | grep -cE '^[89ab][0-9a-f]$')
+    echo $(( bytes - cont ))
+}
+
 function FrameTitle {
     local t="$1" w=80 len pad pad2 sp1 sp2 fill blank
     len=$(charlen "$t")
@@ -89,7 +89,7 @@ function FrameTitle {
 function SubTitle {
     local t="$1" w=64 len total l r fill_l fill_r fill
     len=$(charlen "$t")
-    total=$(( w - 6 - len )); [ "$total" -lt 2 ] && total=2
+    total=$(( w - 8 - len )); [ "$total" -lt 2 ] && total=2
     l=$(( total / 2 )); r=$(( total - l ))
     fill_l=""; [ "$l" -gt 0 ] && fill_l=$(printf '%.0s═' $(seq 1 $l))
     fill_r=""; [ "$r" -gt 0 ] && fill_r=$(printf '%.0s═' $(seq 1 $r))
@@ -493,31 +493,31 @@ function ProfilesMenu {
     while true; do
         clear
         FrameTitle " ПРОФИЛИ WARP "
-        local a=$(active_slot) i pt sp pad fill_col col
+        local a=$(active_slot) i pt sp pad st col
         echo ""
         echo -e "  Сейчас активен: ${GR}Профиль №$a${RS}"
         echo ""
         for i in 1 2 3 4 5; do
             if [ "$i" = "$a" ]; then
+                col="${GR}$i. Выбран профиль №$i${RS}"
                 pt="$i. Выбран профиль №$i"
-                col="${GR}${pt}${RS}"
-                st_txt="[ АКТИВЕН ]"; st_col=$GR
+                st="${GR}[ АКТИВЕН ]${RS}"; stt="[ АКТИВЕН ]"
             elif is_filled "$CONF/warp_${i}.yaml"; then
+                col="${CY}$i.${RS} Выбрать профиль №$i"
                 pt="$i. Выбрать профиль №$i"
-                col="${CY}${i}.${RS} Выбрать профиль №$i"
-                st_txt="[ ГОТОВ ]"; st_col=$GR
+                st="${GR}[ ГОТОВ ]${RS}"; stt="[ ГОТОВ ]"
             else
+                col="${CY}$i.${RS} Выбрать профиль №$i"
                 pt="$i. Выбрать профиль №$i"
-                col="${CY}${i}.${RS} Выбрать профиль №$i"
-                st_txt="[ ПУСТ ]"; st_col=$RD
+                st="${RD}[ ПУСТ ]${RS}"; stt="[ ПУСТ ]"
             fi
-            pad=$(( 44 - 2 - $(charlen "$pt") - 1 - $(charlen "$st_txt") )); [ "$pad" -lt 1 ] && pad=1
+            pad=$(( 36 - $(charlen "$pt") - $(charlen "$stt") )); [ "$pad" -lt 1 ] && pad=1
             sp=$(printf '%*s' "$pad" '')
-            echo -e "  ${col} ${st_col}${st_txt}${RS}${sp}${DM}|${RS}  ${YL}$i$i.${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
+            echo -e "  ${col}${st}${sp}|  ${YL}$i$i.${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
         done
         echo ""
         echo -e "  ${CY}0. Назад${RS} (или Enter)"
-        echo -e "                              ${DM}[ ${RS}${CY}C.${RS} ${RD}Удалить ключи для всех профилей${RS} ${DM}]${RS}"
+        echo -e "                              ${RD}[ ${CY}C.${RS} ${RD}Удалить ключи для всех профилей ]${RS}"
         echo ""
         local c; c=$(get_act)
         case "$c" in
@@ -540,105 +540,77 @@ function ProfilesMenu {
 
 
 function ToggleMode {
-    local m new yn
+    local m new
     m=$(grep "^mode:" "$CFGS" 2>/dev/null | awk '{print $2}')
-    clear
-    SubTitle " РЕЖИМ СЕТЕВОГО ОБХОДА "
-    echo ""
-    if [ "$m" = "global" ]; then
-        echo -e "  Сейчас: ${YL}Глобальный — весь трафик${RS}"
-        echo -e "  Переключить на: ${GR}Обход по списку сайтов${RS}"
-        new="rule"
+    if [ "$m" = "global" ]; then new="rule"; else new="global"; fi
+    sed -i "s/^mode: .*/mode: $new/" "$CFGS"
+    restart_q
+    if [ "$new" = "global" ]; then
+        echo -e "  ${GR}[Готово] Режим изменен: Глобальный — весь трафик через VPN${RS}"
     else
-        echo -e "  Сейчас: ${GR}Обход по списку сайтов${RS}"
-        echo -e "  Переключить на: ${YL}Глобальный — весь трафик${RS}"
-        new="global"
-    fi
-    echo ""
-    echo -n "Подтвердить переключение? (y/n): "
-    read yn; yn=$(RU2EN "$yn")
-    if [ "$yn" = "y" ]; then
-        sed -i "s/^mode: .*/mode: $new/" "$CFGS"
-        restart_q
-        echo -e "  ${GR}[Готово] Режим изменен${RS}"
-    else
-        echo -e "  ${DM}Отменено${RS}"
+        echo -e "  ${GR}[Готово] Режим изменен: Обход по списку сайтов${RS}"
     fi
     sleep 2
 }
 
 function ToggleService {
-    local yn
     if svc_on; then
-        clear
-        SubTitle " ТУННЕЛЬ — ОСТАНОВКА "
-        echo ""
-        echo -e "  Туннель сейчас: ${GR}РАБОТАЕТ${RS}"
-        echo -e "  Действие: ОСТАНОВИТЬ службу — сайты из списка перестанут открываться."
-        echo ""
-        echo -n "Остановить туннель? (y/n): "
-        read yn; yn=$(RU2EN "$yn")
-        if [ "$yn" = "y" ]; then systemctl stop mihomo; echo -e "  ${YL}[Готово] Служба остановлена${RS}"; else echo -e "  ${DM}Отменено${RS}"; fi
+        systemctl stop mihomo
+        echo -e "  ${YL}[Готово] Туннель остановлен${RS}"
     else
-        clear
-        SubTitle " ТУННЕЛЬ — ЗАПУСК "
-        echo ""
-        echo -e "  Туннель сейчас: ${YL}ОСТАНОВЛЕН${RS}"
-        echo -e "  Действие: ЗАПУСТИТЬ службу — обход блокировок возобновится."
-        echo ""
-        echo -n "Запустить туннель? (y/n): "
-        read yn; yn=$(RU2EN "$yn")
-        if [ "$yn" = "y" ]; then systemctl start mihomo; echo -e "  ${GR}[Готово] Служба запущена${RS}"; else echo -e "  ${DM}Отменено${RS}"; fi
+        systemctl start mihomo
+        echo -e "  ${GR}[Готово] Туннель запущен${RS}"
     fi
     sleep 2
 }
 
 function ToggleAutostart {
-    local yn
     if auto_on; then
-        clear
-        SubTitle " АВТОЗАПУСК — ОТКЛЮЧЕНИЕ "
-        echo ""
-        echo -e "  Автозапуск сейчас: ${GR}ВКЛЮЧЕН${RS} (служба стартует при загрузке системы)"
-        echo ""
-        echo -n "Отключить автозапуск? (y/n): "
-        read yn; yn=$(RU2EN "$yn")
-        if [ "$yn" = "y" ]; then systemctl disable mihomo > /dev/null 2>&1; echo -e "  ${YL}[Готово] Автозапуск отключен${RS}"; else echo -e "  ${DM}Отменено${RS}"; fi
+        systemctl disable mihomo > /dev/null 2>&1
+        echo -e "  ${YL}[Готово] Автозапуск отключен${RS}"
     else
-        clear
-        SubTitle " АВТОЗАПУСК — ВКЛЮЧЕНИЕ "
-        echo ""
-        echo -e "  Автозапуск сейчас: ${YL}ВЫКЛЮЧЕН${RS} (при перезагрузке туннель не поднимется)"
-        echo ""
-        echo -n "Включить автозапуск? (y/n): "
-        read yn; yn=$(RU2EN "$yn")
-        if [ "$yn" = "y" ]; then systemctl enable mihomo > /dev/null 2>&1; echo -e "  ${GR}[Готово] Автозапуск включен${RS}"; else echo -e "  ${DM}Отменено${RS}"; fi
+        systemctl enable mihomo > /dev/null 2>&1
+        echo -e "  ${GR}[Готово] Автозапуск включен${RS}"
     fi
     sleep 2
 }
 
 function ToggleSSH {
-    local yn
     if [ -f "$INFORMER" ]; then
-        clear
-        SubTitle " SSH-ИНФОРМЕР — ОТКЛЮЧЕНИЕ "
-        echo ""
-        echo -e "  Сейчас: ${GR}ВКЛЮЧЁН${RS}"
-        echo ""
-        echo -n "Удалить информер из приветствия SSH? (y/n): "
-        read yn; yn=$(RU2EN "$yn")
-        if [ "$yn" = "y" ]; then rm -f "$INFORMER"; echo -e "  ${YL}[Готово] Информер удален${RS}"; else echo -e "  ${DM}Отменено${RS}"; fi
+        rm -f "$INFORMER"
+        echo -e "  ${YL}[Готово] Информер SSH удален${RS}"
     else
-        clear
-        SubTitle " SSH-ИНФОРМЕР — ВКЛЮЧЕНИЕ "
-        echo ""
-        echo -e "  Сейчас: ${YL}ВЫКЛЮЧЕН${RS}"
-        echo ""
-        echo -n "Установить информер в приветствие SSH? (y/n): "
-        read yn; yn=$(RU2EN "$yn")
-        if [ "$yn" = "y" ]; then install_informer; echo -e "  ${GR}[Готово] Информер установлен${RS}"; else echo -e "  ${DM}Отменено${RS}"; fi
+        install_informer
+        echo -e "  ${GR}[Готово] Информер SSH установлен${RS}"
     fi
     sleep 2
+}
+function SettingsMenu {
+    while true; do
+        clear
+        FrameTitle " НАСТРОЙКИ СЛУЖБЫ "
+        echo ""
+        local st_txt st_col au_txt au_col ssh_txt ssh_col
+        if svc_on; then st_txt="Работает"; st_col=$GR; else st_txt="Остановлен"; st_col=$YL; fi
+        if auto_on; then au_txt="Включен"; au_col=$GR; else au_txt="Выключен"; au_col=$YL; fi
+        if [ -f "$INFORMER" ]; then ssh_txt="Включена"; ssh_col=$GR; else ssh_txt="Выключена"; ssh_col=$YL; fi
+        menu_item 7 "Туннель службы (Сам обход через VPN)" "${st_col}[ ${st_txt} ]${RS}"
+        menu_item 8 "Автозапуск Mihomo при загрузке" "${au_col}[ ${au_txt} ]${RS}"
+        menu_item 9 "Состояние Mihomo при входе по SSH" "${ssh_col}[ ${ssh_txt} ]${RS}"
+        echo ""
+        echo -e "  ${DM}Нажмите номер — состояние переключится сразу.${RS}"
+        echo ""
+        echo -e "  ${CY}0.${RS} Назад (или Enter)"
+        echo ""
+        local c; c=$(get_act)
+        case "$c" in
+            7) ToggleService ;;
+            8) ToggleAutostart ;;
+            9) ToggleSSH ;;
+            0|"") return ;;
+            *) echo -e "  ${RD}[ОШИБКА] Неверный ввод — повторите${RS}"; sleep 1 ;;
+        esac
+    done
 }
 
 function LogsScreen {
@@ -764,34 +736,34 @@ function Menu {
     local err_count=$(cat "$ERR_COUNT_FILE" 2>/dev/null || echo "0")
     local last_err=$(cat "$LAST_ERR_FILE" 2>/dev/null || echo "Ошибок нет")
     local n_dom=$(domains_list | grep -c .)
+    local ssh_txt ssh_col
+    if [ -f "$INFORMER" ]; then ssh_txt="Включена"; ssh_col=$GR; else ssh_txt="Выключена"; ssh_col=$YL; fi
 
-    local st_txt st_col
-    if svc_on; then st_txt="[ РАБОТАЕТ ]"; st_col=$GR; else st_txt="[ ОСТАНОВЛЕН ]"; st_col=$YL; fi
-    local au_txt au_col
-    if auto_on; then au_txt="[ ВКЛЮЧЕН ]"; au_col=$GR; else au_txt="[ ВЫКЛЮЧЕН ]"; au_col=$YL; fi
-    local mode_txt mode_col
+    local st_txt st_col au_txt au_col mode_txt mode_col
+    if svc_on; then st_txt="Запущен"; st_col=$GR; else st_txt="Остановлен"; st_col=$YL; fi
+    if auto_on; then au_txt="Включен"; au_col=$GR; else au_txt="Выключен"; au_col=$YL; fi
     if [ "$mode_str" = "global" ]; then
-        mode_txt="[ ГЛОБАЛЬНЫЙ РЕЖИМ ]"; mode_col=$YL
+        mode_txt="Глобальный режим"; mode_col=$YL
     else
-        mode_txt="[ ПО СПИСКУ САЙТОВ ]"; mode_col=$GR
+        mode_txt="По списку сайтов"; mode_col=$GR
     fi
 
     echo ""
-    echo -e "  Статус Mihomo: ${st_col}${st_txt}${RS} | Автозапуск: ${au_col}${au_txt}${RS} | Профиль: ${GR}№${prof}${RS}"
-    echo -e "  Режим сети:   ${mode_col}${mode_txt}${RS}"
+    echo -e "  Статус Mihomo: ${st_col}${st_txt}${RS} | Автозапуск: ${au_col}${au_txt}${RS} | Инфо-строка по SSH: ${ssh_col}${ssh_txt}${RS}"
+    echo -e "  Текущий профиль: ${GR}№${prof}${RS} | Режим сети: ${mode_col}${mode_txt}${RS}"
     if [ "$err_count" -gt 0 ]; then
-        echo -e "  Шлюз связи:   ${RD}НЕДОСТУПЕН${RS} ${DM}(сбоев: $err_count, последний: $last_err)${RS}"
-        echo -e "                 ${YL}Для проверки доступности запустите пункт 10${RS}"
+        echo -e "  Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${DM}(сбоев: $err_count, последний: $last_err)${RS}"
+        echo -e "              ${YL}Для проверки доступности запустите пункт 10${RS}"
     else
-        echo -e "  Шлюз связи:   ${GR}ДОСТУПЕН — сбоев не обнаружено${RS}"
+        echo -e "  Шлюз связи: ${GR}ДОСТУПЕН — сбоев не обнаружено${RS}"
     fi
 
     echo ""
     echo -e "  ${BG}[ МАРШРУТИЗАЦИЯ И ОБХОД БЛОКИРОВОК ]${RS}"
     if [ "$n_dom" -gt 0 ]; then
-        menu_item 1 "Список сайтов в обходе" "${GR}доменов: $n_dom${RS}"
+        menu_item 1 "Список сайтов в обходе" "${GR}[ доменов: $n_dom ]${RS}"
     else
-        menu_item 1 "Список сайтов в обходе" "${RD}список пуст${RS}"
+        menu_item 1 "Список сайтов в обходе" "${RD}[ список пуст ]${RS}"
     fi
     menu_item 2 "Добавить один домен" ""
     menu_item 3 "Добавить домены списком (вставить сразу много)" ""
@@ -799,25 +771,19 @@ function Menu {
 
     echo ""
     echo -e "  ${BG}[ УПРАВЛЕНИЕ ТУННЕЛЕМ И РЕЗЕРВОМ ]${RS}"
-    menu_item 5 "Профили WARP" "${GR}[ ПРОФИЛЬ №${prof} ]${RS}"
+    menu_item 5 "Профили WARP" "${GR}[ Выбран профиль: №${prof} ]${RS}"
 
     echo ""
-    echo -e "  ${BG}[ УПРАВЛЕНИЕ СЕТЬЮ И СЛУЖБОЙ ]${RS}"
-    menu_item 6 "Режим обхода" "${mode_col}${mode_txt}${RS}"
-    menu_item 7 "Туннель службы (Сам обход через VPN)" "${st_col}${st_txt}${RS}"
-    menu_item 8 "Автозапуск Mihomo при загрузке" "${au_col}${au_txt}${RS}"
-    if [ -f "$INFORMER" ]; then
-        menu_item 9 "Состояние Mihomo при входе по SSH" "${GR}[ ВКЛЮЧЕНА ]${RS}"
-    else
-        menu_item 9 "Состояние Mihomo при входе по SSH" "${YL}[ ВЫКЛЮЧЕНА ]${RS}"
-    fi
+    echo -e "  ${BG}[ УПРАВЛЕНИЕ СЕТЬЮ ]${RS}"
+    menu_item 6 "Режим обхода" "${mode_col}[ ${mode_txt} ]${RS}"
+    menu_item S "Настройки (туннель, автозапуск, SSH-информер)" ""
 
     echo ""
     echo -e "  ${BG}[ ДИАГНОСТИКА ]${RS}"
     menu_item 10 "Тест доступности сайтов" ""
 
     echo ""
-      echo -e "  [ ${CY}H.${RS} Справка ]  [ ${CY}U.${RS} Обновление с GitHub ]  [ ${CY}L.${RS} Посмотреть логи ]  [ ${CY}0/Enter.${RS} ${RD}Выход${RS} ]"
+    echo -e "  ${CY}[E],[Enter]${RS}-Выход   ${CY}[L]${RS}-Логи   ${CY}[U]${RS}-Обновление   ${CY}[H]${RS}-Справка"
     echo ""
 }
 
@@ -906,14 +872,12 @@ while true; do
         4) RemoveSiteMenu ;;
         5) ProfilesMenu ;;
         6) ToggleMode ;;
-        7) ToggleService ;;
-        8) ToggleAutostart ;;
-        9) ToggleSSH ;;
+        7|8|9|s|S) SettingsMenu ;;
         10) FullCheckMenu ;;
         h|H) HelpScreen ;;
         u|U) RunUpdateCore ;;
         l|L) LogsScreen ;;
-        0|q|Q|"") clear; exit 0 ;;
+        0|q|Q|e|E|"") clear; exit 0 ;;
         *) echo -e "  ${RD}[ОШИБКА] Неверный ввод — повторите${RS}"; sleep 1 ;;
     esac
 done
