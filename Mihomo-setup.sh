@@ -1,9 +1,8 @@
 #!/bin/bash
 # ==============================================================================
 #   Mihomo-setup.sh — установщик ядра Mihomo (Clash Meta / AmneziaWG)
-#   Debian / Ubuntu / Armbian и другие 64-битные системы (amd64, arm64).
-#   Панель ставится отдельным файлом mihomoutil.sh с GitHub.
-#   Обновление панели: mihomoutil -> пункт U (без переустановки ядра)
+#   Debian / Ubuntu / Armbian (amd64, arm64). Панель ставится отдельным файлом
+#   mihomoutil.sh с GitHub. Обновление панели: mihomoutil -> пункт U
 # ==============================================================================
 
 green=$'\033[92m'
@@ -24,9 +23,20 @@ fi
 cd ~ || exit 1
 clear
 
+# --- charlen: длина строки в СИМВОЛАХ, а не в байтах ---
+# Кириллица в UTF-8 занимает 2 байта на символ; в минимальных окружениях
+# (LANG=C в SSH-сессии) ${#t} считает байты, из-за чего рамки разъезжались.
+function charlen {
+    local b rest
+    b=$(printf '%s' "$1" | wc -c)
+    rest=$(printf '%s' "$1" | LC_ALL=C tr -dc '\200-\277' | wc -c)
+    echo $(( b - rest ))
+}
+
 function ZagolovokInstall {
 local t="Развертывание системы сетевой автоматизации MihomoUtil" w=80
-local len=${#t} pad pad2 fill blank
+local len pad pad2 fill blank
+len=$(charlen "$t")
 pad=$(( (w - 2 - len) / 2 )); [ "$pad" -lt 0 ] && pad=0
 pad2=$(( w - 2 - len - pad ))
 fill=$(printf '%.0s▒' $(seq 1 $((w-2))))
@@ -38,21 +48,31 @@ echo -e "${cyan}║${reset}${bg_header}${blank}${reset}${cyan}║${reset}"
 echo -e "${cyan}╚${fill}╝${reset}"
 }
 
-# Рамки-подзаголовки единой ширины: обе линии всегда одинаковой длины,
-# весь блок отодвинут от левого края на 2 пробела.
+# --- Подзаголовки-рамки: ширина 78 + отступ 2 = правый край на колонке 80 ---
 function SubTitle {
-local t="$1" w=74 len pad pad2 fill_l fill_r
-len=${#t}
-pad=$(( (w - 4 - len) / 2 )); [ "$pad" -lt 2 ] && pad=2
-pad2=$(( w - 4 - len - pad )); [ "$pad2" -lt 2 ] && pad2=2
-fill_l=$(printf '═%.0s' $(seq 1 $pad))
-fill_r=$(printf '═%.0s' $(seq 1 $pad2))
-echo -e "  ${cyan}╔${fill_l}  ${t}  ${fill_r}╗${reset}"
+local t="$1" w=78 len total l r fill_l fill_r
+len=$(charlen "$t")
+total=$(( w - 8 - len )); [ "$total" -lt 2 ] && total=2
+l=$(( total / 2 )); r=$(( total - l ))
+fill_l=""; [ "$l" -gt 0 ] && fill_l=$(printf '%.0s═' $(seq 1 $l))
+fill_r=""; [ "$r" -gt 0 ] && fill_r=$(printf '%.0s═' $(seq 1 $r))
+echo -e "  ${cyan}╔══${fill_l}  ${t}  ${fill_r}╗${reset}"
+}
+function SubBottom {
+local w=78 fill
+fill=$(printf '%.0s═' $(seq 1 $((w-2))))
+echo -e "  ${cyan}╚${fill}╝${reset}"
 }
 
-function SubBottom {
-echo -e "  ${cyan}╚$(printf '═%.0s' $(seq 1 74))╝${reset}"
+# --- Строка сводки с боковыми линиями (блок «УСТАНОВКА ЗАВЕРШЕНА») ---
+# fin_line "Метка:" "видимый текст" "цветной текст"
+function fin_line {
+local label="$1" value="$2" colored="$3" pad sp
+pad=$(( 54 - $(charlen "$value") )); [ "$pad" -lt 1 ] && pad=1
+sp=$(printf '%*s' $(( 18 - $(charlen "$label") )) '')
+echo -e "  ${cyan}║${reset} ${label}${sp} ${colored}$(printf '%*s' "$pad" '') ${cyan}║${reset}"
 }
+# === END_OF_LIB ===
 
 ZagolovokInstall
 echo ""
@@ -68,6 +88,15 @@ ZagolovokInstall
 
 echo ""
 echo -en "  ${dim}# #${reset} Анализ системы и резервное копирование текущих конфигураций..."
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64)  ARCH_NAME="linux-amd64" ;;
+    aarch64) ARCH_NAME="linux-arm64" ;;
+    *)
+        echo -e " ${red}[ОШИБКА] Архитектура $ARCH не поддерживается — нужна amd64 или arm64${reset}"
+        exit 1
+        ;;
+esac
 sudo mkdir -p /tmp/mihomo_bak
 for f in warp_1.yaml warp_2.yaml warp_3.yaml warp_4.yaml warp_5.yaml warp_primary.yaml warp_backup.yaml rules.yaml; do
     if [ -f "/etc/mihomo/$f" ]; then sudo cp -f "/etc/mihomo/$f" /tmp/mihomo_bak/; fi
@@ -107,16 +136,6 @@ sudo rm -rf /tmp/mihomo_bak
 echo -e " ${green}[Готово]${reset}"
 
 echo -en "\n" ; echo -en "  ${dim}# #${reset} Поиск актуального релиза ядра на серверах GitHub API..."
-ARCH=$(uname -m)
-if [ "$ARCH" = "x86_64" ]; then
-    ARCH_NAME="linux-amd64"
-elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    ARCH_NAME="linux-arm64"
-else
-    echo -e " ${red}[ОШИБКА] Архитектура $ARCH не поддерживается — нужна 64-битная ОС (amd64 или arm64)${reset}"
-    exit 1
-fi
-
 LATEST_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | grep "browser_download_url" | grep "$ARCH_NAME" | grep -v -i "compatible" | grep -v ".deb" | head -n 1 | cut -d '"' -f 4)
 if [ -z "$LATEST_URL" ]; then
     LATEST_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases | grep "browser_download_url" | grep "$ARCH_NAME" | grep -v -i "compatible" | grep -v -i "alpha" | grep -v -i "beta" | grep -v ".deb" | head -n 1 | cut -d '"' -f 4)
@@ -156,9 +175,9 @@ else
     clear
     ZagolovokInstall
     echo ""
-    SubTitle " ВЫБОР РЕЖИМА СЕТЕВОГО ОБХОДА "
-    echo -e "  1 — Обход по списку сайтов (только домены из rules.yaml)"
-    echo -e "  2 — Глобальный режим (весь трафик через VPN)"
+    SubTitle "ВЫБОР РЕЖИМА СЕТЕВОГО ОБХОДА"
+    echo -e "    1 — Обход по списку сайтов (только домены из rules.yaml)"
+    echo -e "    2 — Глобальный режим (весь трафик через VPN)"
     SubBottom
     echo ""
     echo -e "  * Если нажать Enter — то по умолчанию выберется первый пункт"
@@ -202,7 +221,7 @@ EOF
     fi
 done
 
-CURRENT_LINK=$(readlink /etc/mihomo/warp.yaml 2>/dev/null)
+CURRENT_LINK=$(sudo readlink /etc/mihomo/warp.yaml 2>/dev/null)
 if [ "$CURRENT_LINK" != "/etc/mihomo/warp_1.yaml" ] && [ "$CURRENT_LINK" != "/etc/mihomo/warp_2.yaml" ] && [ "$CURRENT_LINK" != "/etc/mihomo/warp_3.yaml" ] && [ "$CURRENT_LINK" != "/etc/mihomo/warp_4.yaml" ] && [ "$CURRENT_LINK" != "/etc/mihomo/warp_5.yaml" ]; then
     sudo rm -f /etc/mihomo/warp.yaml
     sudo ln -s /etc/mihomo/warp_1.yaml /etc/mihomo/warp.yaml
@@ -332,16 +351,15 @@ if [ "$SILENT_INSTALL" != true ]; then
     clear
     ZagolovokInstall
     echo ""
-    SubTitle " ИМПОРТ КОНФИГУРАЦИИ AMNEZIAWG "
-    echo -e "  Скопируйте ${green}весь текст${reset} со страницы ${cyan}warp-generation.github.io${reset}"
-    echo -e "  под кнопкой ${green}Clash${reset} и вставьте сюда одним куском."
-    echo -e "  Завершите ввод нажатием ${green}Ctrl + D${reset}."
-    echo -e "  ${dim}Скрипт сам вырежет нужный блок и очистит экран от лишнего текста.${reset}"
+    SubTitle "ИМПОРТ КОНФИГУРАЦИИ AMNEZIAWG"
+    echo -e "    Скопируйте ${green}весь текст${reset} со страницы ${cyan}warp-generation.github.io${reset}"
+    echo -e "    под кнопкой ${green}Clash${reset} и вставьте сюда одним куском."
+    echo -e "    Завершите ввод нажатием ${green}Ctrl + D${reset}."
+    echo -e "    ${dim}Скрипт сам вырежет нужный блок и очистит экран от лишнего текста.${reset}"
     echo ""
-    echo -e "  ${yellow}Enter или S — пропустить (ключи можно добавить позже через панель).${reset}"
+    echo -e "    ${yellow}Enter или S — пропустить (ключи можно добавить позже через панель).${reset}"
     SubBottom
-    echo ""
-    printf "  Вставка: "
+    printf "    Вставка: "
     tmp=$(mktemp)
     read -r FIRST_LINE
     FIRST_LINE=$(printf '%s' "$FIRST_LINE" | tr -d '\r')
@@ -421,44 +439,45 @@ if [ "$HAS_KEYS" != true ]; then
     echo ""
 fi
 if [ "$HAS_KEYS" = true ]; then
-SubTitle " ФИНАЛЬНАЯ ПРОВЕРКА ДОСТУПНОСТИ "
-echo -e "  Опрос сайтов из списка через порт шлюза 7890 (VPN-интерфейс):"
-echo ""
-FAILS=0
-TOTAL=0
-while read -r d; do
-    [ -z "$d" ] && continue
-    code=$(curl -4 -s -o /dev/null -w "%{http_code}" --socks5-hostname 127.0.0.1:7890 --connect-timeout 6 "https://$d")
-    TOTAL=$((TOTAL+1))
-    if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ] || [ "$code" = "403" ]; then
-        echo -e "   ${green}[ДОСТУПЕН]${reset}  $d"
+    SubTitle "ФИНАЛЬНАЯ ПРОВЕРКА ДОСТУПНОСТИ"
+    echo -e "    Опрос сайтов из списка через порт шлюза 7890 (VPN-интерфейс):"
+    echo ""
+    FAILS=0
+    TOTAL=0
+    while read -r d; do
+        [ -z "$d" ] && continue
+        code=$(curl -4 -s -o /dev/null -w "%{http_code}" --socks5-hostname 127.0.0.1:7890 --connect-timeout 6 "https://$d")
+        TOTAL=$((TOTAL+1))
+        if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ] || [ "$code" = "403" ]; then
+            echo -e "   ${green}[ДОСТУПЕН]${reset}  $d"
+        else
+            echo -e "   ${red}[НЕДОСТУПЕН]${reset}  $d  (HTTP: $code)"
+            FAILS=$((FAILS+1))
+        fi
+        sleep 1
+    done < <(sed -n "s/.*DOMAIN-SUFFIX,\([^']*\).*/\1/p" /etc/mihomo/rules.yaml)
+    echo ""
+    if [ "$TOTAL" -eq 0 ]; then
+        echo -e "  ${yellow}Список пуст — добавьте домены через панель (пункт 2)${reset}"
+    elif [ "$FAILS" -gt 0 ]; then
+        echo -e "  ${red}Итог: сбоев $FAILS из $TOTAL. Если сбои у всех — проверьте ключи (пункт 5)${reset}"
     else
-        echo -e "   ${red}[НЕДОСТУПЕН]${reset}  $d  (HTTP: $code)"
-        FAILS=$((FAILS+1))
+        echo -e "  ${green}Итог: все $TOTAL сайтов доступны${reset}"
     fi
-    sleep 1
-done < <(sed -n "s/.*DOMAIN-SUFFIX,\([^']*\).*/\1/p" /etc/mihomo/rules.yaml)
-echo ""
-if [ "$TOTAL" -eq 0 ]; then
-    echo -e "  ${yellow}Список пуст — добавьте домены через панель (пункт 2)${reset}"
-elif [ "$FAILS" -gt 0 ]; then
-    echo -e "  ${red}Итог: сбоев $FAILS из $TOTAL. Если сбои у всех — проверьте ключи (пункт 5)${reset}"
-else
-    echo -e "  ${green}Итог: все $TOTAL сайтов доступны${reset}"
-fi
-SubBottom
+    SubBottom
 fi
 
 echo ""
-SubTitle " УСТАНОВКА ЗАВЕРШЕНА "
-echo -e "  Версия ядра:        ${green}${FINAL_VER:-неизвестна}${reset}"
-echo -e "  Внешний IP:         $OLD_IP"
-echo -e "  Режим сети:         ${green}$([ "$START_MODE" = "global" ] && echo "Глобальный — весь трафик через VPN" || echo "Обход по списку сайтов")${reset}"
-echo -e "  Панель управления:  ${green}mihomoutil${reset}  ${dim}(запуск из любого места)${reset}"
-echo -e "  Служба:             ${green}sudo systemctl status mihomo${reset}"
+SubTitle "УСТАНОВКА ЗАВЕРШЕНА"
+if [ "$START_MODE" = "global" ]; then MODE_TEXT="Глобальный — весь трафик через VPN"; else MODE_TEXT="Обход по списку сайтов"; fi
+fin_line "Версия ядра:"       "${FINAL_VER:-неизвестна}" "${green}${FINAL_VER:-неизвестна}${reset}"
+fin_line "Внешний IP:"        "$OLD_IP" "$OLD_IP"
+fin_line "Режим сети:"        "$MODE_TEXT" "${green}${MODE_TEXT}${reset}"
+fin_line "Панель управления:" "mihomoutil  (запуск из любого места)" "${green}mihomoutil${reset}  ${dim}(запуск из любого места)${reset}"
+fin_line "Служба:"            "sudo systemctl status mihomo" "${green}sudo systemctl status mihomo${reset}"
 SubBottom
 echo ""
-echo -n "Нажмите Enter для запуска панели mihomoutil (0 — выход): "
+echo -n "  Нажмите Enter для запуска панели mihomoutil (0 — выход): "
 read FINAL_WAIT
 if [ "$FINAL_WAIT" != "0" ]; then
     kill "$SUDO_PID" 2>/dev/null
