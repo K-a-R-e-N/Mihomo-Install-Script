@@ -12,6 +12,15 @@ DM=$'\033[90m'
 RS=$'\033[0m'
 BG=$'\033[30;47m'
 
+# Подсчёт видимой длины строки в символах (независимо от локали):
+# символ = байты ASCII + ведущие байты UTF-8 (кириллица больше не ломает рамки)
+function charlen {
+    local a l
+    a=$(printf '%s' "$1" | LC_ALL=C tr -cd '\000-\177' | wc -c)
+    l=$(printf '%s' "$1" | LC_ALL=C tr -cd '\300-\377' | wc -c)
+    echo $(( a + l ))
+}
+
 REPO_UTIL="https://raw.githubusercontent.com/K-a-R-e-N/Mihomo-Install-Script/main/mihomoutil.sh"
 REPO_API="https://api.github.com/repos/K-a-R-e-N/Mihomo-Install-Script/commits?path=mihomoutil.sh&per_page=1"
 SETUP_API="https://api.github.com/repos/K-a-R-e-N/Mihomo-Install-Script/commits?path=Mihomo-setup.sh&per_page=1"
@@ -62,7 +71,7 @@ function RU2EN {
 
 function FrameTitle {
     local t="$1" w=80 len pad pad2 sp1 sp2 fill blank
-    len=${#t}
+    len=$(charlen "$t")
     pad=$(( (w - 2 - len) / 2 )); [ "$pad" -lt 0 ] && pad=0
     pad2=$(( w - 2 - len - pad ))
     sp1=$(printf '%*s' "$pad" '')
@@ -79,13 +88,13 @@ function FrameTitle {
 
 function SubTitle {
     local t="$1" w=64 len total l r fill_l fill_r fill
-    len=${#t}
+    len=$(charlen "$t")
     total=$(( w - 6 - len )); [ "$total" -lt 2 ] && total=2
     l=$(( total / 2 )); r=$(( total - l ))
     fill_l=""; [ "$l" -gt 0 ] && fill_l=$(printf '%.0s═' $(seq 1 $l))
     fill_r=""; [ "$r" -gt 0 ] && fill_r=$(printf '%.0s═' $(seq 1 $r))
     fill=""
-    fill=$(printf '%.0s═' $(seq 1 $w))
+    if [ $((w-2)) -gt 0 ]; then fill=$(printf '%.0s═' $(seq 1 $((w-2)))); fi
     echo -e "${CY}╔══${fill_l}  ${t}  ${fill_r}╗${RS}"
     echo -e "${CY}╚${fill}╝${RS}"
 }
@@ -458,7 +467,7 @@ function InputKeysSlot {
         chmod 600 "$f" 2>/dev/null
         rm -f "$tmp" "$tmp.clean" "$tmp.out"
         clear
-        echo -e "  ${GR}[Готово] Ключи сохранены в Профиль №$num (прокси: $NPROXY)${RS}}"
+        echo -e "  ${GR}[Готово] Ключи сохранены в Профиль №$num (прокси: $NPROXY)${RS}"
         echo -e "  ${DM}Файл профиля: $f${RS}"
         sleep 2
         return 0
@@ -489,21 +498,26 @@ function ProfilesMenu {
         echo -e "  Сейчас активен: ${GR}Профиль №$a${RS}"
         echo ""
         for i in 1 2 3 4 5; do
-            if is_filled "$CONF/warp_${i}.yaml"; then fill_col="${GR}[заполнен]${RS}"; else fill_col="${RD}[ПУСТ]${RS}"; fi
             if [ "$i" = "$a" ]; then
                 pt="$i. Выбран профиль №$i"
-                col="${GR}$i. Выбран профиль №$i${RS}"
+                col="${GR}${pt}${RS}"
+                st_txt="[ АКТИВЕН ]"; st_col=$GR
+            elif is_filled "$CONF/warp_${i}.yaml"; then
+                pt="$i. Выбрать профиль №$i"
+                col="${CY}${i}.${RS} Выбрать профиль №$i"
+                st_txt="[ ГОТОВ ]"; st_col=$GR
             else
                 pt="$i. Выбрать профиль №$i"
-                col="${CY}$i.${RS} Выбрать профиль №$i"
+                col="${CY}${i}.${RS} Выбрать профиль №$i"
+                st_txt="[ ПУСТ ]"; st_col=$RD
             fi
-            pad=$(( 36 - ${#pt} )); [ "$pad" -lt 2 ] && pad=2
+            pad=$(( 44 - 2 - $(charlen "$pt") - 1 - $(charlen "$st_txt") )); [ "$pad" -lt 1 ] && pad=1
             sp=$(printf '%*s' "$pad" '')
-            echo -e "  ${col} $fill_col${sp}|  ${YL}$i$i.${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
+            echo -e "  ${col} ${st_col}${st_txt}${RS}${sp}${DM}|${RS}  ${YL}$i$i.${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
         done
         echo ""
         echo -e "  ${CY}0. Назад${RS} (или Enter)"
-        echo -e "                              ${RD}C. Удалить ключи для всех профилей${RS}"
+        echo -e "                              ${DM}[ ${RS}${CY}C.${RS} ${RD}Удалить ключи для всех профилей${RS} ${DM}]${RS}"
         echo ""
         local c; c=$(get_act)
         case "$c" in
@@ -752,24 +766,24 @@ function Menu {
     local n_dom=$(domains_list | grep -c .)
 
     local st_txt st_col
-    if svc_on; then st_txt="РАБОТАЕТ"; st_col=$GR; else st_txt="ОСТАНОВЛЕН"; st_col=$YL; fi
+    if svc_on; then st_txt="[ РАБОТАЕТ ]"; st_col=$GR; else st_txt="[ ОСТАНОВЛЕН ]"; st_col=$YL; fi
     local au_txt au_col
-    if auto_on; then au_txt="ВКЛЮЧЕН"; au_col=$GR; else au_txt="ВЫКЛЮЧЕН"; au_col=$YL; fi
+    if auto_on; then au_txt="[ ВКЛЮЧЕН ]"; au_col=$GR; else au_txt="[ ВЫКЛЮЧЕН ]"; au_col=$YL; fi
     local mode_txt mode_col
     if [ "$mode_str" = "global" ]; then
-        mode_txt="Глобальный — весь трафик"; mode_col=$YL
+        mode_txt="[ ГЛОБАЛЬНЫЙ РЕЖИМ ]"; mode_col=$YL
     else
-        mode_txt="Обход по списку сайтов"; mode_col=$GR
+        mode_txt="[ ПО СПИСКУ САЙТОВ ]"; mode_col=$GR
     fi
 
     echo ""
     echo -e "  Статус Mihomo: ${st_col}${st_txt}${RS} | Автозапуск: ${au_col}${au_txt}${RS} | Профиль: ${GR}№${prof}${RS}"
-    echo -e "  Режим сети: ${mode_col}${mode_txt}${RS}"
+    echo -e "  Режим сети:   ${mode_col}${mode_txt}${RS}"
     if [ "$err_count" -gt 0 ]; then
-        echo -e "  Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${DM}(сбоев: $err_count, последний: $last_err)${RS}"
-        echo -e "             ${YL}Для проверки доступности запустите пункт 10${RS}"
+        echo -e "  Шлюз связи:   ${RD}НЕДОСТУПЕН${RS} ${DM}(сбоев: $err_count, последний: $last_err)${RS}"
+        echo -e "                 ${YL}Для проверки доступности запустите пункт 10${RS}"
     else
-        echo -e "  Шлюз связи: ${GR}ДОСТУПЕН — сбоев не обнаружено${RS}"
+        echo -e "  Шлюз связи:   ${GR}ДОСТУПЕН — сбоев не обнаружено${RS}"
     fi
 
     echo ""
@@ -785,7 +799,7 @@ function Menu {
 
     echo ""
     echo -e "  ${BG}[ УПРАВЛЕНИЕ ТУННЕЛЕМ И РЕЗЕРВОМ ]${RS}"
-    menu_item 5 "Профили WARP" "${GR}Выбран профиль №${prof}${RS}"
+    menu_item 5 "Профили WARP" "${GR}[ ПРОФИЛЬ №${prof} ]${RS}"
 
     echo ""
     echo -e "  ${BG}[ УПРАВЛЕНИЕ СЕТЬЮ И СЛУЖБОЙ ]${RS}"
@@ -793,9 +807,9 @@ function Menu {
     menu_item 7 "Туннель службы (Сам обход через VPN)" "${st_col}${st_txt}${RS}"
     menu_item 8 "Автозапуск Mihomo при загрузке" "${au_col}${au_txt}${RS}"
     if [ -f "$INFORMER" ]; then
-        menu_item 9 "Состояние Mihomo при входе по SSH" "${GR}ВКЛЮЧЕНА${RS}"
+        menu_item 9 "Состояние Mihomo при входе по SSH" "${GR}[ ВКЛЮЧЕНА ]${RS}"
     else
-        menu_item 9 "Состояние Mihomo при входе по SSH" "${YL}ВЫКЛЮЧЕНА${RS}"
+        menu_item 9 "Состояние Mihomo при входе по SSH" "${YL}[ ВЫКЛЮЧЕНА ]${RS}"
     fi
 
     echo ""
@@ -803,7 +817,7 @@ function Menu {
     menu_item 10 "Тест доступности сайтов" ""
 
     echo ""
-      echo -e "  ${CY}H.${RS} Справка  ${CY}U.${RS} Обновление с GitHub  ${CY}L.${RS} Посмотреть логи  ${CY}0/Enter.${RS} ${RD}Выход${RS}"
+      echo -e "  [ ${CY}H.${RS} Справка ]  [ ${CY}U.${RS} Обновление с GitHub ]  [ ${CY}L.${RS} Посмотреть логи ]  [ ${CY}0/Enter.${RS} ${RD}Выход${RS} ]"
     echo ""
 }
 
@@ -814,7 +828,7 @@ function menu_item {
         echo -e "  ${CY}${n}.${RS} ${t}"
         return
     fi
-    local pad=$(( 50 - ${#t} )); [ "$pad" -lt 1 ] && pad=1
+    local pad=$(( 50 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
     local sp=$(printf '%*s' "$pad" '')
     echo -e "  ${CY}${n}.${RS} ${t}${sp}${s}"
 }
