@@ -64,13 +64,23 @@ fill=$(printf '%.0s═' $(seq 1 $((w-2))))
 echo -e "  ${cyan}╚${fill}╝${reset}"
 }
 
-# --- Строка сводки с боковыми линиями (блок «УСТАНОВКА ЗАВЕРШЕНА») ---
-# fin_line "Метка:" "видимый текст" "цветной текст"
-function fin_line {
-local label="$1" value="$2" colored="$3" pad sp
-pad=$(( 54 - $(charlen "$value") )); [ "$pad" -lt 1 ] && pad=1
-sp=$(printf '%*s' $(( 18 - $(charlen "$label") )) '')
-echo -e "  ${cyan}║${reset} ${label}${sp} ${colored}$(printf '%*s' "$pad" '') ${cyan}║${reset}"
+# --- Инфо-фрейм «ПОЛЕЗНАЯ ИНФОРМАЦИЯ»: ширина 61 + отступ 9 ---
+function InfoTop {
+local t="$1" w=61 len pad fill
+len=$(charlen "$t")
+pad=$(( w - 8 - len )); [ "$pad" -lt 2 ] && pad=2
+fill=$(printf '%.0s═' $(seq 1 $pad))
+echo -e "         ${cyan}╔══  ${t}  ${fill}╗${reset}"
+}
+function InfoBottom {
+local w=61 fill
+fill=$(printf '%.0s═' $(seq 1 $((w-2))))
+echo -e "         ${cyan}╚${fill}╝${reset}"
+}
+function info_line {
+local label="$1" value="$2" sp
+sp=$(printf '%*s' $(( 19 - $(charlen "$label") )) '')
+echo -e "             ${label}${sp}${value}"
 }
 # === END_OF_LIB ===
 
@@ -351,7 +361,7 @@ if [ "$SILENT_INSTALL" != true ]; then
     clear
     ZagolovokInstall
     echo ""
-    SubTitle "ИМПОРТ КОНФИГУРАЦИИ AMNEZIAWG"
+    SubTitle "ИМПОРТ КОНФИГУРАЦИИ WARP"
     echo -e "    Скопируйте ${green}весь текст${reset} со страницы ${cyan}warp-generation.github.io${reset}"
     echo -e "    под кнопкой ${green}Clash${reset} и вставьте сюда одним куском."
     echo -e "    Завершите ввод нажатием ${green}Ctrl + D${reset}."
@@ -440,7 +450,6 @@ if [ "$HAS_KEYS" != true ]; then
 fi
 if [ "$HAS_KEYS" = true ]; then
     SubTitle "ФИНАЛЬНАЯ ПРОВЕРКА ДОСТУПНОСТИ"
-    echo -e "    Опрос сайтов из списка через порт шлюза 7890 (VPN-интерфейс):"
     echo ""
     FAILS=0
     TOTAL=0
@@ -449,33 +458,41 @@ if [ "$HAS_KEYS" = true ]; then
         code=$(curl -4 -s -o /dev/null -w "%{http_code}" --socks5-hostname 127.0.0.1:7890 --connect-timeout 6 "https://$d")
         TOTAL=$((TOTAL+1))
         if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ] || [ "$code" = "403" ]; then
-            echo -e "   ${green}[ДОСТУПЕН]${reset}  $d"
+            echo -e "      ${green}[ДОСТУПЕН]${reset}  $d"
         else
-            echo -e "   ${red}[НЕДОСТУПЕН]${reset}  $d  (HTTP: $code)"
+            echo -e "      ${red}[НЕДОСТУПЕН]${reset}  $d  (HTTP: $code)"
             FAILS=$((FAILS+1))
         fi
         sleep 1
     done < <(sed -n "s/.*DOMAIN-SUFFIX,\([^']*\).*/\1/p" /etc/mihomo/rules.yaml)
     echo ""
     if [ "$TOTAL" -eq 0 ]; then
-        echo -e "  ${yellow}Список пуст — добавьте домены через панель (пункт 2)${reset}"
+        echo -e "      ${yellow}Список пуст — добавьте домены через панель (пункт 2)${reset}"
     elif [ "$FAILS" -gt 0 ]; then
-        echo -e "  ${red}Итог: сбоев $FAILS из $TOTAL. Если сбои у всех — проверьте ключи (пункт 5)${reset}"
+        echo -e "      Доступных сайтов из списка всего: $((TOTAL-FAILS))"
+        echo -e "      ${red}Недоступных сайтов: $FAILS — проверьте ключи (пункт 5)${reset}"
     else
-        echo -e "  ${green}Итог: все $TOTAL сайтов доступны${reset}"
+        echo -e "      ${green}Доступных сайтов из списка всего: $TOTAL${reset}"
     fi
     SubBottom
 fi
 
 echo ""
-SubTitle "УСТАНОВКА ЗАВЕРШЕНА"
-if [ "$START_MODE" = "global" ]; then MODE_TEXT="Глобальный — весь трафик через VPN"; else MODE_TEXT="Обход по списку сайтов"; fi
-fin_line "Версия ядра:"       "${FINAL_VER:-неизвестна}" "${green}${FINAL_VER:-неизвестна}${reset}"
-fin_line "Внешний IP:"        "$OLD_IP" "$OLD_IP"
-fin_line "Режим сети:"        "$MODE_TEXT" "${green}${MODE_TEXT}${reset}"
-fin_line "Панель управления:" "mihomoutil  (запуск из любого места)" "${green}mihomoutil${reset}  ${dim}(запуск из любого места)${reset}"
-fin_line "Служба:"            "sudo systemctl status mihomo" "${green}sudo systemctl status mihomo${reset}"
-SubBottom
+InfoTop "ПОЛЕЗНАЯ ИНФОРМАЦИЯ"
+WARP_TXT="Не импортирован"; WARP_COL=$yellow
+if [ "$HAS_KEYS" = true ]; then WARP_TXT="Импортирован"; WARP_COL=$green; fi
+if [ "$START_MODE" = "global" ]; then MODE_TEXT="Глобальный режим"; else MODE_TEXT="По списку сайтов"; fi
+info_line "Версия ядра:"     "${green}${FINAL_VER:-неизвестна}${reset}"
+info_line "Внешний IP:"      "$OLD_IP"
+info_line "Режим обхода:"    "${green}${MODE_TEXT}${reset}"
+info_line "Конфиг WARP:"     "${WARP_COL}${WARP_TXT}${reset}"
+info_line "Служба:"          "${green}sudo systemctl status mihomo${reset}"
+info_line "Запуск утилиты:"  "${green}mihomoutil${reset}  ${dim}(запуск из любого места)${reset}"
+InfoBottom
+echo ""
+echo ""
+DONE_FILL=$(printf '%.0s═' $(seq 1 11))
+printf '%*s%s\n' 17 '' "${cyan}${DONE_FILL}${reset}  УСТАНОВКА ЗАВЕРШЕНА  ${cyan}${DONE_FILL}${reset}"
 echo ""
 echo -n "  Нажмите Enter для запуска панели mihomoutil (0 — выход): "
 read FINAL_WAIT
