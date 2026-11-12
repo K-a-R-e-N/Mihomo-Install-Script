@@ -737,11 +737,11 @@ function Menu {
     local last_err=$(cat "$LAST_ERR_FILE" 2>/dev/null || echo "Ошибок нет")
     local n_dom=$(domains_list | grep -c .)
     local ssh_txt ssh_col
-    if [ -f "$INFORMER" ]; then ssh_txt="Включена"; ssh_col=$GR; else ssh_txt="Выключена"; ssh_col=$YL; fi
+    if [ -f "$INFORMER" ]; then ssh_txt="Вкл"; ssh_col=$GR; else ssh_txt="Выкл"; ssh_col=$YL; fi
 
     local st_txt st_col au_txt au_col mode_txt mode_col
     if svc_on; then st_txt="Запущен"; st_col=$GR; else st_txt="Остановлен"; st_col=$YL; fi
-    if auto_on; then au_txt="Включен"; au_col=$GR; else au_txt="Выключен"; au_col=$YL; fi
+    if auto_on; then au_txt="Вкл"; au_col=$GR; else au_txt="Выкл"; au_col=$YL; fi
     if [ "$mode_str" = "global" ]; then
         mode_txt="Глобальный режим"; mode_col=$YL
     else
@@ -750,10 +750,10 @@ function Menu {
 
     echo ""
     echo -e "  Статус Mihomo: ${st_col}${st_txt}${RS} | Автозапуск: ${au_col}${au_txt}${RS} | Инфо-строка по SSH: ${ssh_col}${ssh_txt}${RS}"
-    echo -e "  Текущий профиль: ${GR}№${prof}${RS} | Режим сети: ${mode_col}${mode_txt}${RS}"
+    echo -e "  Текущий профиль: ${GR}№${prof}${RS} | Режим обхода: ${mode_col}${mode_txt}${RS}"
     if [ "$err_count" -gt 0 ]; then
         echo -e "  Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${DM}(сбоев: $err_count, последний: $last_err)${RS}"
-        echo -e "              ${YL}Для проверки доступности запустите пункт 10${RS}"
+        echo -e "              ${YL}Для проверки доступности нажмите клавишу T${RS}"
     else
         echo -e "  Шлюз связи: ${GR}ДОСТУПЕН — сбоев не обнаружено${RS}"
     fi
@@ -761,32 +761,24 @@ function Menu {
     echo ""
     echo -e "  ${BG}[ МАРШРУТИЗАЦИЯ И ОБХОД БЛОКИРОВОК ]${RS}"
     if [ "$n_dom" -gt 0 ]; then
-        menu_item 1 "Список сайтов в обходе" "${GR}[ доменов: $n_dom ]${RS}"
+        menu_item 1 "Список сайтов для обхода" "${GR}[ Всего: $n_dom ]${RS}"
     else
-        menu_item 1 "Список сайтов в обходе" "${RD}[ список пуст ]${RS}"
+        menu_item 1 "Список сайтов для обхода" "${RD}[ список пуст ]${RS}"
     fi
-    menu_item 2 "Добавить один домен" ""
-    menu_item 3 "Добавить домены списком (вставить сразу много)" ""
-    menu_item 4 "Удалить домены" ""
+    menu_item 2 "Добавить один домен в список" ""
+    menu_item 3 "Добавить несколько доменов в список" ""
+    menu_item 4 "Удалить из списка домен" ""
 
     echo ""
-    echo -e "  ${BG}[ УПРАВЛЕНИЕ ТУННЕЛЕМ И РЕЗЕРВОМ ]${RS}"
-    menu_item 5 "Профили WARP" "${GR}[ Выбран профиль: №${prof} ]${RS}"
-
-    echo ""
-    echo -e "  ${BG}[ УПРАВЛЕНИЕ СЕТЬЮ ]${RS}"
+    echo -e "  ${BG}[ УПРАВЛЕНИЕ ТРАФИКОМ И СИСТЕМОЙ ]${RS}"
+    menu_item 5 "Управление профилями WARP" "${GR}[ Выбран профиль: №${prof} ]${RS}"
     menu_item 6 "Режим обхода" "${mode_col}[ ${mode_txt} ]${RS}"
     menu_item S "Настройки (туннель, автозапуск, SSH-информер)" ""
 
     echo ""
-    echo -e "  ${BG}[ ДИАГНОСТИКА ]${RS}"
-    menu_item 10 "Тест доступности сайтов" ""
-
-    echo ""
-    echo -e "  ${CY}[E],[Enter]${RS}-Выход   ${CY}[L]${RS}-Логи   ${CY}[U]${RS}-Обновление   ${CY}[H]${RS}-Справка"
+    echo -e "  ${CY}[E],[Enter]${RS}-${RD}Выход${RS}      ${CY}[T]${RS}-Тест сети  ${CY}[L]${RS}-Логи  ${CY}[U]${RS}-Обновление  ${CY}[H]${RS}-Справка"
     echo ""
 }
-
 
 function menu_item {
     local n="$1" t="$2" s="$3"
@@ -794,7 +786,7 @@ function menu_item {
         echo -e "  ${CY}${n}.${RS} ${t}"
         return
     fi
-    local pad=$(( 50 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
+    local pad=$(( 52 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
     local sp=$(printf '%*s' "$pad" '')
     echo -e "  ${CY}${n}.${RS} ${t}${sp}${s}"
 }
@@ -873,7 +865,7 @@ while true; do
         5) ProfilesMenu ;;
         6) ToggleMode ;;
         7|8|9|s|S) SettingsMenu ;;
-        10) FullCheckMenu ;;
+        10|t|T) FullCheckMenu ;;
         h|H) HelpScreen ;;
         u|U) RunUpdateCore ;;
         l|L) LogsScreen ;;
