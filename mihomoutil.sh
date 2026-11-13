@@ -11,6 +11,7 @@ RD=$'\033[91m'
 DM=$'\033[90m'
 RS=$'\033[0m'
 BG=$'\033[30;47m'
+WT=$'\033[1;37m'
 
 REPO_UTIL="https://raw.githubusercontent.com/K-a-R-e-N/Mihomo-Install-Script/main/mihomoutil.sh"
 REPO_API="https://api.github.com/repos/K-a-R-e-N/Mihomo-Install-Script/commits?path=mihomoutil.sh&per_page=1"
@@ -728,6 +729,29 @@ function RunUpdateCore {
     pause
 }
 
+# --- Гео-данные для главного меню: IP, страна, провайдер (кэш 10 минут) ---
+function geo_data {
+    local cache=/tmp/mihomo_geo.txt now=$(date +%s) ts
+    if [ -f "$cache" ]; then
+        ts=$(sed -n 1p "$cache" 2>/dev/null)
+        case "$ts" in ''|*[!0-9]*) ts=0 ;; esac
+        if [ $((now - ts)) -lt 600 ]; then
+            tail -n +2 "$cache"
+            return
+        fi
+    fi
+    local resp=$(curl -4 -s --connect-timeout 3 "http://ip-api.com/line/?fields=query,countryCode,isp")
+    local out=$(printf '%s' "$resp" | sed -n 1p)
+    local cc=$(printf '%s' "$resp" | sed -n 2p)
+    local isp=$(printf '%s' "$resp" | sed -n 3p)
+    if [ -z "$out" ]; then
+        echo "Не определено"; echo ""; echo ""
+        return
+    fi
+    printf '%s\n%s\n%s\n' "$out" "$cc" "$isp" > "$cache" 2>/dev/null
+    echo "$out"; echo "$cc"; echo "$isp"
+}
+
 function Menu {
     clear
     FrameTitle " ПАНЕЛЬ УПРАВЛЕНИЯ И АВТОМАТИЗАЦИИ MIHOMOUTIL "
@@ -740,7 +764,7 @@ function Menu {
     if [ -f "$INFORMER" ]; then ssh_txt="Вкл"; ssh_col=$GR; else ssh_txt="Выкл"; ssh_col=$YL; fi
 
     local st_txt st_col au_txt au_col mode_txt mode_col
-    if svc_on; then st_txt="Запущен"; st_col=$GR; else st_txt="Остановлен"; st_col=$YL; fi
+    if svc_on; then st_txt="Запущен"; st_col=$GR; else st_txt="Остановлен"; st_col=$RD; fi
     if auto_on; then au_txt="Вкл"; au_col=$GR; else au_txt="Выкл"; au_col=$YL; fi
     if [ "$mode_str" = "global" ]; then
         mode_txt="Глобальный режим"; mode_col=$YL
@@ -748,47 +772,60 @@ function Menu {
         mode_txt="По списку сайтов"; mode_col=$GR
     fi
 
+    local geo=$(geo_data)
+    local ip=$(printf '%s' "$geo" | sed -n 1p)
+    local cc=$(printf '%s' "$geo" | sed -n 2p)
+    local isp=$(printf '%s' "$geo" | sed -n 3p)
+    local sep=$(printf '%.0s─' $(seq 1 66))
+
     echo ""
     echo -e "  Статус Mihomo: ${st_col}${st_txt}${RS} | Автозапуск: ${au_col}${au_txt}${RS} | Инфо-строка по SSH: ${ssh_col}${ssh_txt}${RS}"
-    echo -e "  Текущий профиль: ${GR}№${prof}${RS} | Режим обхода: ${mode_col}${mode_txt}${RS}"
+    echo ""
+    echo -e "  ${DM}${sep}${RS}"
+    echo ""
+    if [ -n "$cc" ]; then
+        echo -e "  Внешний IP: ${GR}${ip}${RS} ${DM}(${cc}, ${isp})${RS}"
+    else
+        echo -e "  Внешний IP: ${YL}Не определено${RS}"
+    fi
     if [ "$err_count" -gt 0 ]; then
         echo -e "  Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${DM}(сбоев: $err_count, последний: $last_err)${RS}"
-        echo -e "              ${YL}Для проверки доступности нажмите клавишу T${RS}"
+        echo -e "   ${YL}Для повторной проверки нажмите клавишу T${RS}"
     else
         echo -e "  Шлюз связи: ${GR}ДОСТУПЕН — сбоев не обнаружено${RS}"
     fi
 
     echo ""
-    echo -e "  ${BG}[ МАРШРУТИЗАЦИЯ И ОБХОД БЛОКИРОВОК ]${RS}"
+    echo -e "  ${WT}■ МАРШРУТИЗАЦИЯ И ОБХОД БЛОКИРОВОК${RS}"
     if [ "$n_dom" -gt 0 ]; then
-        menu_item 1 "Список сайтов для обхода" "${GR}[ Всего: $n_dom ]${RS}"
+        menu_item 1 "Список сайтов в обходе" "${GR}[ Доменов: $n_dom ]${RS}"
     else
-        menu_item 1 "Список сайтов для обхода" "${RD}[ список пуст ]${RS}"
+        menu_item 1 "Список сайтов в обходе" "${RD}[ Доменов: 0 ]${RS}"
     fi
-    menu_item 2 "Добавить один домен в список" ""
-    menu_item 3 "Добавить несколько доменов в список" ""
-    menu_item 4 "Удалить из списка домен" ""
+    menu_item 2 "Добавить один домен" ""
+    menu_item 3 "Добавить домены списком" ""
+    menu_item 4 "Удалить домены" ""
 
     echo ""
-    echo -e "  ${BG}[ УПРАВЛЕНИЕ ТРАФИКОМ И СИСТЕМОЙ ]${RS}"
-    menu_item 5 "Управление профилями WARP" "${GR}[ Выбран профиль: №${prof} ]${RS}"
+    echo -e "  ${WT}■ УПРАВЛЕНИЕ ТРАФИКОМ И СИСТЕМОЙ${RS}"
+    menu_item 5 "Управление с конфигурациями WARP" "${GR}[ Выбран: №${prof} ]${RS}"
     menu_item 6 "Режим обхода" "${mode_col}[ ${mode_txt} ]${RS}"
     menu_item S "Настройки (туннель, автозапуск, SSH-информер)" ""
 
     echo ""
-    echo -e "  ${CY}[E],[Enter]${RS}-${RD}Выход${RS}      ${CY}[T]${RS}-Тест сети  ${CY}[L]${RS}-Логи  ${CY}[U]${RS}-Обновление  ${CY}[H]${RS}-Справка"
+    echo -e "  ${CY}[F],[Enter]${RS}-${RD}Выход${RS} | ${CY}[T]${RS}-${GR}Тест сети${RS} | ${CY}[L]${RS}-Логи | ${CY}[U]${RS}-Обновление | ${CY}[H]${RS}-Справка"
     echo ""
 }
 
 function menu_item {
     local n="$1" t="$2" s="$3"
     if [ -z "$s" ]; then
-        echo -e "  ${CY}${n}.${RS} ${t}"
+        echo -e "  (${n}) ${t}"
         return
     fi
-    local pad=$(( 52 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
+    local pad=$(( 56 - 4 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
     local sp=$(printf '%*s' "$pad" '')
-    echo -e "  ${CY}${n}.${RS} ${t}${sp}${s}"
+    echo -e "  (${n}) ${t}${sp}${s}"
 }
 
 if [ "$#" -gt 0 ]; then
@@ -869,7 +906,7 @@ while true; do
         h|H) HelpScreen ;;
         u|U) RunUpdateCore ;;
         l|L) LogsScreen ;;
-        0|q|Q|e|E|"") clear; exit 0 ;;
+        0|q|Q|e|E|f|F|"") clear; exit 0 ;;
         *) echo -e "  ${RD}[ОШИБКА] Неверный ввод — повторите${RS}"; sleep 1 ;;
     esac
 done
