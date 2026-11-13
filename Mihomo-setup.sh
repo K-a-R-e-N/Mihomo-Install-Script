@@ -48,9 +48,9 @@ echo -e "${cyan}║${reset}${bg_header}${blank}${reset}${cyan}║${reset}"
 echo -e "${cyan}╚${fill}╝${reset}"
 }
 
-# --- Подзаголовки-рамки: ширина 78 + отступ 2 = правый край на колонке 80 ---
+# --- Подзаголовки-рамки: ширина 76 + отступ 2 = правый край на колонке 78 ---
 function SubTitle {
-local t="$1" w=78 len total l r fill_l fill_r
+local t="$1" w=76 len total l r fill_l fill_r
 len=$(charlen "$t")
 total=$(( w - 8 - len )); [ "$total" -lt 2 ] && total=2
 l=$(( total / 2 )); r=$(( total - l ))
@@ -59,7 +59,7 @@ fill_r=""; [ "$r" -gt 0 ] && fill_r=$(printf '%.0s═' $(seq 1 $r))
 echo -e "  ${cyan}╔══${fill_l}  ${t}  ${fill_r}╗${reset}"
 }
 function SubBottom {
-local w=78 fill
+local w=76 fill
 fill=$(printf '%.0s═' $(seq 1 $((w-2))))
 echo -e "  ${cyan}╚${fill}╝${reset}"
 }
@@ -400,9 +400,9 @@ if [ "$SILENT_INSTALL" != true ]; then
         fi
     done
     if [ -n "$EXIST_PROFILE" ]; then
-        echo -e "    ${green}В системе уже есть конфигурация WARP — она сохранена и работает (Профиль №$EXIST_PROFILE).${reset}"
+        echo -e "    ${green}Внимание! В системе обнаружена конфигурация WARP под профилем №$EXIST_PROFILE.${reset}"
         echo -e "    ${yellow}Новая вставка запишется в Профиль №1 и заменит действующие ключи!${reset}"
-        echo -e "    ${dim}При работающих ключах шаг можно пропустить (Enter или S) — ничего не сломается.${reset}"
+        echo -e "    ${dim}При работающих ключах шаг можно пропустить (Enter или S).${reset}"
         echo ""
     fi
     echo -e "    Скопируйте ${green}весь текст${reset} со страницы ${cyan}warp-generation.github.io${reset}"
