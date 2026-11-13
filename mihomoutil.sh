@@ -508,27 +508,30 @@ function ProfilesMenu {
     while true; do
         clear
         FrameTitle " ПРОФИЛИ WARP "
-        local a=$(active_slot) i pt sp pad st col
+        local a=$(active_slot) i txt st stt num_col p1 pl pr iw
         echo ""
         echo -e "  ${BW}Сейчас активен:${RS} ${GR}Профиль №$a${RS}"
         echo ""
         for i in 1 2 3 4 5; do
             if [ "$i" = "$a" ]; then
-                col="${GY}(${GR}$i${GY})${RS} ${WT}Выбран профиль №$i${RS}"
-                pt="Выбран профиль №$i"
+                num_col="${GR}"
+                txt="Выбран профиль №$i"
                 st="${GR}[ АКТИВЕН ]${RS}"; stt="[ АКТИВЕН ]"
             elif is_filled "$CONF/warp_${i}.yaml"; then
-                col="${GY}(${BW}$i${GY})${RS} ${WT}Выбрать профиль №$i${RS}"
-                pt="Выбрать профиль №$i"
+                num_col="${BW}"
+                txt="Выбрать профиль №$i"
                 st="${GR}[ ГОТОВ ]${RS}"; stt="[ ГОТОВ ]"
             else
-                col="${GY}(${BW}$i${GY})${RS} ${WT}Выбрать профиль №$i${RS}"
-                pt="Выбрать профиль №$i"
+                num_col="${BW}"
+                txt="Выбрать профиль №$i"
                 st="${RD}[ ПУСТ ]${RS}"; stt="[ ПУСТ ]"
             fi
-            pad=$(( 46 - 6 - $(charlen "$pt") - $(charlen "$stt") )); [ "$pad" -lt 1 ] && pad=1
-            sp=$(printf '%*s' "$pad" '')
-            echo -e "  ${col}${sp}${st}  ${GY}|${RS}  ${GY}(${YL}$i$i${GY})${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
+            # Левая колонка: текст прижат к 28-й; статус — отдельная колонка 29-42, по центру
+            p1=$(( 28 - 2 - 4 - $(charlen "$txt") )); [ "$p1" -lt 1 ] && p1=1
+            iw=14
+            pl=$(( (iw - $(charlen "$stt")) / 2 )); [ "$pl" -lt 0 ] && pl=0
+            pr=$(( iw - pl - $(charlen "$stt") ))
+            echo -e "  ${GY}(${num_col}$i${GY})${RS} ${WT}${txt}${RS}$(printf '%*s' "$p1" '')$(printf '%*s' "$pl" '')${st}$(printf '%*s' "$pr" '')${RS}  ${GY}|${RS}  ${GY}(${YL}$i$i${GY})${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
         done
         echo ""
         echo -e "  ${GY}(${BW}0${GY})${RS} ${WT}Назад${RS} ${GY}(или Enter)${RS}"
