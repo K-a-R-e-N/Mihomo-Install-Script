@@ -514,7 +514,7 @@ function ProfilesMenu {
         echo ""
         for i in 1 2 3 4 5; do
             if [ "$i" = "$a" ]; then
-                col="${GY}(${GR}$i${GY})${RS} ${WT}Выбран профиль №$i${RS}"
+                col="${GY}(${GR}$i${GY})${RS} ${GR}Выбран профиль №$i${RS}"
                 pt="Выбран профиль №$i"
                 st="${GR}[ АКТИВЕН ]${RS}"; stt="[ АКТИВЕН ]"
             elif is_filled "$CONF/warp_${i}.yaml"; then
@@ -817,10 +817,10 @@ function Menu {
         echo -e "  ${BW}Внешний IP: ${YL}${geo_ip}${RS} ${GY}(${geo_info})${RS}"
     fi
     if [ "$err_count" -gt 0 ]; then
-        echo -e "  ${BW}Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${GY}(сбоев: ${err_count}, последний: ${last_err})${RS}"
+        echo -e "  ${BW}VPN-туннель: ${RD}ПРОБЛЕМЫ${RS} ${GY}(сбоев: ${err_count}, последний: ${last_err})${RS}"
         echo -e "              ${YL}Для повторной проверки нажмите клавишу T${RS}"
     else
-        echo -e "  ${BW}Шлюз связи: ${GR}ДОСТУПЕН${RS} ${GY}(сбоев: 0)${RS}"
+        echo -e "  ${BW}VPN-туннель: ${GR}РАБОТАЕТ${RS} ${GY}(сбоев: 0)${RS}"
     fi
     echo ""
 
