@@ -10,9 +10,9 @@ yellow=$'\033[93m'
 red=$'\033[91m'
 cyan=$'\033[96m'
 dim=$'\033[90m'
-orange=$'\033[38;5;208m'
 reset=$'\033[0m'
 bg_header=$'\033[30;47m'
+orange=$'\033[38;5;208m'
 
 REPO_RAW="https://raw.githubusercontent.com/K-a-R-e-N/Mihomo-Install-Script/main"
 REPO_API="https://api.github.com/repos/K-a-R-e-N/Mihomo-Install-Script/commits"
@@ -65,8 +65,16 @@ fill=$(printf '%.0s═' $(seq 1 $((w-2))))
 echo -e "  ${cyan}╚${fill}╝${reset}"
 }
 
-# --- Рамки опроса сайтов: оранжевые ---
-function SubTitleOr {
+# --- Баннер режима: ═══  текст  ═══ по центру экрана ---
+function ModeBanner {
+local t="$1" len pad
+len=$(charlen "$t")
+pad=$(( (80 - len - 10) / 2 )); [ "$pad" -lt 0 ] && pad=0
+echo -e "$(printf '%*s' "$pad" '')${green}═══${reset}  ${green}${t}${reset}  ${green}═══${reset}"
+}
+
+# --- Рамка опроса сайтов: оранжевая, ширина 78 + отступ 2 = правый край на колонке 80 ---
+function OrangeTop {
 local t="$1" w=78 len total l r fill_l fill_r
 len=$(charlen "$t")
 total=$(( w - 8 - len )); [ "$total" -lt 2 ] && total=2
@@ -75,38 +83,29 @@ fill_l=""; [ "$l" -gt 0 ] && fill_l=$(printf '%.0s═' $(seq 1 $l))
 fill_r=""; [ "$r" -gt 0 ] && fill_r=$(printf '%.0s═' $(seq 1 $r))
 echo -e "  ${orange}╔══${fill_l}  ${t}  ${fill_r}╗${reset}"
 }
-function SubBottomOr {
+function OrangeBottom {
 local w=78 fill
 fill=$(printf '%.0s═' $(seq 1 $((w-2))))
 echo -e "  ${orange}╚${fill}╝${reset}"
 }
 
-# --- Центрированный баннер режима: ═══  текст  ═══ ---
-function CenterBanner {
-local t="$1" len pad fill
-len=$(charlen "$t")
-pad=$(( (80 - len - 10) / 2 )); [ "$pad" -lt 0 ] && pad=0
-fill=$(printf '%.0s═' $(seq 1 3))
-echo -e "$(printf '%*s' "$pad" '')${green}${fill}  ${t}  ${fill}${reset}"
-}
-
-# --- Инфо-фрейм «ПОЛЕЗНАЯ ИНФОРМАЦИЯ»: ширина 60, отступ 15, желтая рамка ---
+# --- Инфо-фрейм «ПОЛЕЗНАЯ ИНФОРМАЦИЯ»: желтый, ширина 61 + отступ 13 ---
 function InfoTop {
-local t="$1" w=60 len pad fill
+local t="$1" w=61 len pad fill
 len=$(charlen "$t")
-pad=$(( w - 4 - 2 - len - 2 )); [ "$pad" -lt 2 ] && pad=2
+pad=$(( w - 8 - len )); [ "$pad" -lt 2 ] && pad=2
 fill=$(printf '%.0s═' $(seq 1 $pad))
-echo -e "               ${yellow}╔══  ${t}  ${fill}╗${reset}"
+echo -e "             ${yellow}╔══  ${t}  ${fill}╗${reset}"
 }
 function InfoBottom {
-local w=60 fill
+local w=61 fill
 fill=$(printf '%.0s═' $(seq 1 $((w-2))))
-echo -e "               ${yellow}╚${fill}╝${reset}"
+echo -e "             ${yellow}╚${fill}╝${reset}"
 }
 function info_line {
 local label="$1" value="$2" sp
-sp=$(printf '%*s' $(( 17 - $(charlen "$label") )) '')
-echo -e "                 ${label}${sp}${value}"
+sp=$(printf '%*s' $(( 16 - $(charlen "$label") )) '')
+echo -e "                ${label}${sp}${value}"
 }
 # === END_OF_LIB ===
 
@@ -201,17 +200,11 @@ fi
 sudo chmod +x /usr/local/bin/mihomo
 echo -e " ${green}[Готово]${reset}"
 
-echo -en "\n" ; echo -en "  ${dim}# #${reset} Очистка установочных файлов и временных хвостов..."
-rm -rf ~/Mihomo-Install-Script
-sudo rm -f /usr/local/bin/mihomo_download.* 2>/dev/null
-sudo rm -rf /tmp/mihomo_bak /tmp/mihomo_tmp 2>/dev/null
-echo -e " ${green}[Готово]${reset}"
-
 FINAL_VER=$(/usr/local/bin/mihomo -v 2>/dev/null | head -n 1 | awk '{print $3}')
 
 if [ "$SILENT_INSTALL" = true ]; then
     echo ""
-    CenterBanner "Тихая установка: автоматически выбран режим обхода по списку сайтов"
+    ModeBanner "Тихая установка: автоматически выбран режим обхода по списку сайтов"
     START_MODE="rule"
 else
     clear
@@ -234,9 +227,9 @@ else
     echo ""
     echo ""
     if [ "$START_MODE" = "global" ]; then
-        CenterBanner "Выбран режим: Глобальный — весь трафик через VPN"
+        ModeBanner "Выбран режим: Глобальный — весь трафик через VPN"
     else
-        CenterBanner "Выбран режим: Обход по списку сайтов"
+        ModeBanner "Выбран режим: Обход по списку сайтов"
     fi
 fi
 
@@ -370,6 +363,11 @@ sudo systemctl enable mihomo > /dev/null 2>&1
 sudo systemctl start mihomo > /dev/null 2>&1
 echo -e " ${green}[Готово]${reset}"
 
+echo -en "\n" ; echo -en "  ${dim}# #${reset} Очистка временных файлов установщика..."
+rm -rf ~/Mihomo-Install-Script
+sudo rm -f /usr/local/bin/mihomo_download.* 2>/dev/null
+echo -e " ${green}[Готово]${reset}"
+
 echo -en "\n" ; echo -en "  ${dim}# #${reset} Установка SSH-информера статуса..."
 sudo tee /etc/profile.d/mihomoutil_motd.sh > /dev/null << 'EOF_INFO'
 # Информер MihomoUtil (создается установщиком Mihomo-setup.sh)
@@ -389,22 +387,22 @@ EOF_INFO
 sudo chmod +x /etc/profile.d/mihomoutil_motd.sh
 echo -e " ${green}[Готово]${reset}"
 
-HAS_KEYS_BEFORE=false
-for _i in 1 2 3 4 5; do
-    if sudo test -s "/etc/mihomo/warp_$_i.yaml" && ! sudo grep -q "EMPTY-SLOT" "/etc/mihomo/warp_$_i.yaml" 2>/dev/null; then
-        HAS_KEYS_BEFORE=true
-    fi
-done
-
 if [ "$SILENT_INSTALL" != true ]; then
+    HAS_OLD=false
+    for _i in 1 2 3 4 5; do
+        if sudo test -s "/etc/mihomo/warp_$_i.yaml" && ! sudo grep -q "EMPTY-SLOT" "/etc/mihomo/warp_$_i.yaml" 2>/dev/null; then
+            HAS_OLD=true
+        fi
+    done
     clear
     ZagolovokInstall
     echo ""
     SubTitle "ИМПОРТ КОНФИГУРАЦИИ WARP"
-    if [ "$HAS_KEYS_BEFORE" = true ]; then
+    if [ "$HAS_OLD" = true ]; then
+        echo ""
         echo -e "    ${green}В системе уже есть конфигурация WARP — она сохранена и работает.${reset}"
         echo -e "    ${yellow}Новая вставка запишется в Профиль №1 и заменит действующие ключи!${reset}"
-        echo -e "    ${dim}Если ключи работают — пропустите шаг (Enter или S), ничего не сломается.${reset}"
+        echo -e "    ${dim}Если ключи работают, шаг можно пропустить — ничего не сломается.${reset}"
         echo ""
     fi
     echo -e "    Скопируйте ${green}весь текст${reset} со страницы ${cyan}warp-generation.github.io${reset}"
@@ -494,7 +492,7 @@ if [ "$HAS_KEYS" != true ]; then
     echo ""
 fi
 if [ "$HAS_KEYS" = true ]; then
-    SubTitleOr "ОПРОС ЗАБЛОКИРОВАННЫХ САЙТОВ НА ДОСТУПНОСТЬ"
+    OrangeTop "ОПРОС ЗАБЛОКИРОВАННЫХ САЙТОВ НА ДОСТУПНОСТЬ"
     echo ""
     FAILS=0
     TOTAL=0
@@ -519,7 +517,8 @@ if [ "$HAS_KEYS" = true ]; then
     else
         echo -e "      ${green}Доступных сайтов из списка всего: $TOTAL${reset}"
     fi
-    SubBottomOr
+    echo ""
+    OrangeBottom
 fi
 
 echo ""
@@ -527,26 +526,29 @@ InfoTop "ПОЛЕЗНАЯ ИНФОРМАЦИЯ"
 WARP_TXT="Не импортирован"; WARP_COL=$yellow
 if [ "$HAS_KEYS" = true ]; then WARP_TXT="Импортирован"; WARP_COL=$green; fi
 if [ "$START_MODE" = "global" ]; then MODE_TEXT="Глобальный режим"; else MODE_TEXT="По списку сайтов"; fi
-
-if sudo systemctl is-active --quiet mihomo 2>/dev/null; then SVC_TXT="Активен"; SVC_COL=$green; else SVC_TXT="Не активен"; SVC_COL=$yellow; fi
-LOC_IF=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}' | head -n 1)
-LOC_IP=$(ip -4 addr show ${LOC_IF:-eth0} 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -n 1)
-[ -z "$LOC_IP" ] && LOC_IP="Не определено" && LOC_IF=""
-GEO_TXT=$(curl -4 -s --connect-timeout 4 "http://ip-api.com/line/?fields=country,city,as" 2>/dev/null)
-GEO_COUNTRY=$(printf '%s' "$GEO_TXT" | sed -n 1p)
-GEO_CITY=$(printf '%s' "$GEO_TXT" | sed -n 2p)
-GEO_AS=$(printf '%s' "$GEO_TXT" | sed -n 3p)
-if [ -n "$GEO_COUNTRY" ] && [ "$GEO_COUNTRY" != "undefined" ]; then
-    GEO_TEXT="$GEO_COUNTRY${GEO_CITY:+, $GEO_CITY} (${GEO_AS:-сеть не определена})"
+if systemctl is-active --quiet mihomo; then
+    SVC_VAL="${green}Активен${reset} ${dim}(sudo systemctl status mihomo)${reset}"
 else
-    GEO_TEXT="Не определено"
+    SVC_VAL="${yellow}Не активен${reset}"
 fi
-
+LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -n1)
+IFACE=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}' | head -n1)
+if [ -z "$LOCAL_IP" ]; then LOCAL_IP="Не определен"; IFACE=""; fi
+GEO_TXT="Не определено"
+GEO_DATA=$(curl -4 -s --connect-timeout 4 "http://ip-api.com/line/?fields=country,city,as")
+if [ -n "$GEO_DATA" ]; then
+    GEO_C=$(printf '%s' "$GEO_DATA" | sed -n 1p)
+    GEO_S=$(printf '%s' "$GEO_DATA" | sed -n 2p)
+    GEO_A=$(printf '%s' "$GEO_DATA" | sed -n 3p)
+    if [ -n "$GEO_C" ] && [ -n "$GEO_A" ]; then
+        GEO_TXT="${GEO_C}, ${GEO_S} (${GEO_A})"
+    fi
+fi
 info_line "Версия ядра:"     "${green}${FINAL_VER:-неизвестна}${reset}"
-info_line "Статус службы:"   "${SVC_COL}${SVC_TXT} ${dim}(sudo systemctl status mihomo)${reset}"
-info_line "Локальный IP:"    "${green}${LOC_IP}${reset}${LOC_IF:+ ${dim}(${LOC_IF})${reset}}"
+info_line "Статус службы:"   "$SVC_VAL"
+info_line "Локальный IP:"    "${LOCAL_IP} ${dim}(${IFACE})${reset}"
 info_line "Мой внешний IP:"  "$OLD_IP"
-info_line "Локация / Сеть:"  "$GEO_TEXT"
+info_line "Локация / Сеть:"  "$GEO_TXT"
 info_line "Режим обхода:"    "${green}${MODE_TEXT}${reset}"
 info_line "Конфиг WARP:"     "${WARP_COL}${WARP_TXT}${reset}"
 info_line "Запуск утилиты:"  "${green}mihomoutil${reset}  ${dim}(запуск из любого места)${reset}"
@@ -556,8 +558,7 @@ echo ""
 DONE_FILL=$(printf '%.0s═' $(seq 1 11))
 printf '%*s%s\n' 17 '' "${cyan}${DONE_FILL}${reset}  УСТАНОВКА ЗАВЕРШЕНА  ${cyan}${DONE_FILL}${reset}"
 echo ""
-echo -e " ${cyan}══════════${reset}"
-echo ""
+echo -e "${cyan}══════════${reset}"
 echo -n "  Нажмите Enter для запуска панели mihomoutil (0 — выход): "
 read FINAL_WAIT
 if [ "$FINAL_WAIT" != "0" ]; then
