@@ -235,7 +235,7 @@ function ViewSites {
     while read -r d; do
         [ -z "$d" ] && continue
         n=$((n+1))
-        echo -e "   ${GY}(${BW}${n}${GY})${RS} ${WT}${d}${RS}"
+        echo -e "   ${GR}$n.${RS} $d"
     done < <(domains_list)
     [ "$n" -eq 0 ] && echo -e "   ${RD}Список пуст${RS}"
     echo ""
@@ -271,7 +271,7 @@ function BulkEditMenu {
     SubTitle " МАССОВОЕ РЕДАКТИРОВАНИЕ СПИСКА "
     echo ""
     echo -e "  Вставьте список доменов (каждый с новой строки) и завершите вводом ${GR}Ctrl + D${RS}."
-    echo -e "  ${YL}Enter или S — отмена.${RS}"
+    echo -e "  ${YL}Enter — отмена.${RS}"
     echo ""
     tmp=$(mktemp)
     cat > "$tmp" 2>/dev/null
@@ -312,7 +312,7 @@ function RemoveSiteMenu {
     local n=0 d
     while read -r d; do
         [ -z "$d" ] && continue
-        n=$((n+1)); echo -e "   ${GY}(${BW}${n}${GY})${RS} ${WT}${d}${RS}"
+        n=$((n+1)); echo -e "   ${GR}$n.${RS} $d"
     done < <(domains_list)
     [ "$n" -eq 0 ] && echo -e "   ${RD}Список пуст${RS}"
     echo ""
@@ -393,7 +393,7 @@ function InputKeysSlot {
         echo -e "  Завершите ввод нажатием ${GR}Ctrl + D${RS}."
         echo -e "  ${DM}Скрипт сам вырежет нужный блок и очистит экран от лишнего текста.${RS}"
         echo ""
-        echo -e "  ${YL}Enter или S${RS} — пропустить этот шаг."
+        echo -e "  ${YL}Enter${RS} — пропустить этот шаг."
         echo -e "  ${RD}D / Delete / Clear${RS} — очистить профиль (удалить ключи с диска)."
         echo ""
         tmp=$(mktemp)
@@ -501,29 +501,26 @@ function ProfilesMenu {
         FrameTitle " ПРОФИЛИ WARP "
         local a=$(active_slot) i pt sp pad st col
         echo ""
-        echo -e "  ${BW}Сейчас активен: ${GR}Профиль №$a${RS}"
+        echo -e "  ${BW}Сейчас активен:${RS} ${GR}Профиль №$a${RS}"
         echo ""
         for i in 1 2 3 4 5; do
             if [ "$i" = "$a" ]; then
-                col="${GY}(${BW}${i}${GY})${RS} ${GR}Выбран профиль №${i}${RS}"
-                pt="Выбран профиль №$i"
+                col="${GR}Выбран профиль №$i${RS}"; pt="Выбран профиль №$i"
                 st="${GR}[ АКТИВЕН ]${RS}"; stt="[ АКТИВЕН ]"
             elif is_filled "$CONF/warp_${i}.yaml"; then
-                col="${GY}(${BW}${i}${GY})${RS} ${WT}Выбрать профиль №${i}${RS}"
-                pt="Выбрать профиль №$i"
+                col="${WT}Выбрать профиль №$i${RS}"; pt="Выбрать профиль №$i"
                 st="${GR}[ ГОТОВ ]${RS}"; stt="[ ГОТОВ ]"
             else
-                col="${GY}(${BW}${i}${GY})${RS} ${WT}Выбрать профиль №${i}${RS}"
-                pt="Выбрать профиль №$i"
+                col="${WT}Выбрать профиль №$i${RS}"; pt="Выбрать профиль №$i"
                 st="${RD}[ ПУСТ ]${RS}"; stt="[ ПУСТ ]"
             fi
-            pad=$(( 40 - 6 - $(charlen "$pt") - $(charlen "$stt") )); [ "$pad" -lt 2 ] && pad=2
+            pad=$(( 46 - 7 - $(charlen "$pt") - $(charlen "$stt") )); [ "$pad" -lt 1 ] && pad=1
             sp=$(printf '%*s' "$pad" '')
-            echo -e "  ${col}${st}${sp}${GY}|${RS}  ${GY}(${BW}${i}${i}${GY})${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
+            echo -e "  ${GY}(${BW}${i}${GY})${RS} ${col}${st}${sp}${GY}|${RS}  ${GY}(${BW}${i}${i}${GY})${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
         done
         echo ""
         echo -e "  ${GY}(${BW}0${GY})${RS} ${WT}Назад (или Enter)${RS}"
-        echo -e "                              ${RD}[ ${BW}C${RS} ${RD}Удалить ключи для всех профилей ]${RS}"
+        echo -e "  ${GY}(${BW}C${GY})${RS} ${RD}Удалить ключи для всех профилей${RS}"
         echo ""
         local c; c=$(get_act)
         case "$c" in
@@ -606,7 +603,7 @@ function SettingsMenu {
         echo ""
         echo -e "  ${DM}Нажмите номер — состояние переключится сразу.${RS}"
         echo ""
-        echo -e "  ${CY}0.${RS} Назад (или Enter)"
+        echo -e "  ${GY}(${BW}0${GY})${RS} ${WT}Назад (или Enter)${RS}"
         echo ""
         local c; c=$(get_act)
         case "$c" in
@@ -734,7 +731,7 @@ function RunUpdateCore {
     pause
 }
 
-GEO_CACHE=/tmp/mihomo_geo.txt
+GEO_CACHE=/tmp/mihomo_geo_ru.txt
 
 # --- Внешний IP с кэшем на 10 минут, чтобы перерисовка меню не тормозила ---
 function get_geo_line {
@@ -747,9 +744,9 @@ function get_geo_line {
         fi
     fi
     local resp ip cc isp
-    resp=$(curl -4 -s --connect-timeout 3 --max-time 6 "http://ip-api.com/json/?fields=query,countryCode,isp")
+    resp=$(curl -4 -s --connect-timeout 3 --max-time 6 "http://ip-api.com/json/?fields=query,country,isp&lang=ru")
     ip=$(printf '%s' "$resp" | grep -o '"query":"[^"]*"' | cut -d'"' -f4)
-    cc=$(printf '%s' "$resp" | grep -o '"countryCode":"[^"]*"' | cut -d'"' -f4)
+    cc=$(printf '%s' "$resp" | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
     isp=$(printf '%s' "$resp" | grep -o '"isp":"[^"]*"' | cut -d'"' -f4)
     if [ -n "$ip" ]; then
         line=$(printf '%s\t%s, %s' "$ip" "$cc" "$isp")
@@ -792,15 +789,15 @@ function Menu {
     echo -e " ${GY}${div}${RS}"
     echo ""
     if [ "$geo_info" = "-" ]; then
-        echo -e "  ${BW}Внешний IP: ${YL}Не определено${RS}"
+        echo -e "  ${BW}Внешний IP:${RS} ${YL}Не определено${RS}"
     else
-        echo -e "  ${BW}Внешний IP: ${YL}${geo_ip}${RS} ${GY}(${geo_info})${RS}"
+        echo -e "  ${BW}Внешний IP:${RS} ${YL}${geo_ip}${RS} ${GY}(${geo_info})${RS}"
     fi
     if [ "$err_count" -gt 0 ]; then
-        echo -e "  ${BW}Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${GY}(сбоев: ${err_count}, последний: ${last_err})${RS}"
+        echo -e "  ${BW}Шлюз связи:${RS} ${RD}НЕДОСТУПЕН${RS} ${GY}(сбоев: ${err_count}, последний: ${last_err})${RS}"
         echo -e "              ${YL}Для повторной проверки нажмите клавишу T${RS}"
     else
-        echo -e "  ${BW}Шлюз связи: ${GR}ДОСТУПЕН${RS} ${GY}(сбоев: 0)${RS}"
+        echo -e "  ${BW}Шлюз связи:${RS} ${GR}ДОСТУПЕН${RS} ${GY}(сбоев: 0)${RS}"
     fi
     echo ""
 
@@ -829,7 +826,7 @@ function Menu {
     local d6="Режим обхода"
     pad=$(( 57 - 7 - $(charlen "$d6") )); [ "$pad" -lt 1 ] && pad=1
     echo -e "  ${GY}(${BW}6${GY})${RS} ${WT}${d6}${RS}$(printf '%*s' "$pad" '')${WT}[ ${mode_col}${mode_txt}${RS} ${WT}]${RS}"
-    echo -e "  ${GY}(${BW}S${GY})${RS} ${WT}Настройки (туннель, автозапуск, SSH-информер)${RS}"
+    echo -e "  ${GY}(${BW}7${GY})${RS} ${WT}Настройки (туннель, автозапуск, SSH-информер)${RS}"
     echo ""
     echo -e " ${GY}${div}${RS}"
     echo -e " ${GY}[${BW}E${GY}]${WT},${GY}[${BW}Enter${GY}]${WT}-${RD}Выход${RS}      ${GY}[${BW}T${GY}]${WT}-${GR}Тест сети${RS}   ${GY}[${BW}L${GY}]${WT}-Логи   ${GY}[${BW}U${GY}]${WT}-Обновление   ${GY}[${BW}H${GY}]${WT}-Справка${RS}"
