@@ -9,6 +9,7 @@ GR=$'\033[1;32m'
 YL=$'\033[1;33m'
 RD=$'\033[1;31m'
 DM=$'\033[0;90m'
+GY=$'\033[0;90m'
 RS=$'\033[0m'
 BG=$'\033[1;38;5;16;107m'
 # Цвета главного меню (по образцу): WT — белый, BW — жирно-белый, GY — серый,
@@ -65,6 +66,9 @@ fi
 function RU2EN {
     printf '%s' "$1" | sed 's|[йЙ]|q|g; s|[цЦ]|w|g; s|[уУ]|e|g; s|[кК]|r|g; s|[еЕ]|t|g; s|[нН]|y|g; s|[гГ]|u|g; s|[шШ]|i|g; s|[щЩ]|o|g; s|[зЗ]|p|g; s|[хХ]|[|g; s|[ъЪ]|]|g; s|[фФ]|a|g; s|[ыЫ]|s|g; s|[вВ]|d|g; s|[аА]|f|g; s|[пП]|g|g; s|[рР]|h|g; s|[оО]|j|g; s|[лЛ]|k|g; s|[дД]|l|g; s|[яЯ]|z|g; s|[чЧ]|x|g; s|[сС]|c|g; s|[мМ]|v|g; s|[иИ]|b|g; s|[тТ]|n|g; s|[ьЬ]|m|g'
 }
+
+# Экранирование для sed-адресов: точка в ya.ru больше не матчит yaxru
+function sed_esc { printf '%s' "$1" | sed 's/[.[\*^$]/\\&/g'; }
 
 function charlen {
     local s="$1"
@@ -235,7 +239,7 @@ function ViewSites {
     while read -r d; do
         [ -z "$d" ] && continue
         n=$((n+1))
-        echo -e "   ${GR}$n.${RS} $d"
+        echo -e "   ${GY}(${BW}$n${GY})${RS} $d"
     done < <(domains_list)
     [ "$n" -eq 0 ] && echo -e "   ${RD}Список пуст${RS}"
     echo ""
@@ -245,7 +249,7 @@ function ViewSites {
 function AddSiteMenu {
     local nd
     clear
-    SubTitle " ДОБАВЛЕНИЕ ДОМЕНА "
+    FrameTitle " ДОБАВЛЕНИЕ ДОМЕНА "
     echo ""
     echo -n "Введите домен для добавления (0 — отмена): "
     read nd
@@ -259,6 +263,7 @@ function AddSiteMenu {
         echo -e "  ${YL}[ВНИМАНИЕ] Домен $nd уже в списке${RS}"
         sleep 2; return
     fi
+    grep -q '^payload:' "$RULES" 2>/dev/null || printf 'payload:\n' > "$RULES"
     sed -i "/^payload:/a\\  - 'DOMAIN-SUFFIX,$nd'" "$RULES"
     restart_q
     echo -e "  ${GR}[Готово] Домен $nd добавлен, служба перезапущена${RS}"
@@ -266,23 +271,21 @@ function AddSiteMenu {
 }
 
 function BulkEditMenu {
-    local tmp d added=0 bad=0 dup=0 nl cmd
+    local tmp d added=0 bad=0 dup=0 first
     clear
-    SubTitle " МАССОВОЕ РЕДАКТИРОВАНИЕ СПИСКА "
+    FrameTitle " МАССОВОЕ РЕДАКТИРОВАНИЕ СПИСКА "
     echo ""
     echo -e "  Вставьте список доменов (каждый с новой строки) и завершите вводом ${GR}Ctrl + D${RS}."
     echo -e "  ${YL}Enter — отмена.${RS}"
     echo ""
     tmp=$(mktemp)
-    cat > "$tmp" 2>/dev/null
-    if ! grep -q '[^[:space:]]' "$tmp" 2>/dev/null; then
+    read -r first
+    first=$(printf '%s' "$first" | tr -d '\r\t ' | tr '[:upper:]' '[:lower:]')
+    if [ -z "$first" ]; then
         rm -f "$tmp"; echo -e "  ${YL}[Отменено]${RS}"; sleep 2; return
     fi
-    nl=$(wc -l < "$tmp")
-    cmd=$(head -n1 "$tmp" | tr -d '\r\t ' | tr '[:upper:]' '[:lower:]')
-    if [ "$nl" -le 2 ] && [ "$cmd" = "s" ]; then
-        rm -f "$tmp"; echo -e "  ${YL}[Отменено]${RS}"; sleep 2; return
-    fi
+    printf '%s\n' "$first" > "$tmp"
+    cat >> "$tmp" 2>/dev/null
     while read -r d; do
         d=$(printf '%s' "$d" | tr -d ' \r')
         [ -z "$d" ] && continue
@@ -293,6 +296,7 @@ function BulkEditMenu {
         if domains_list | grep -qx "$d"; then
             dup=$((dup+1)); continue
         fi
+        grep -q '^payload:' "$RULES" 2>/dev/null || printf 'payload:\n' > "$RULES"
         sed -i "/^payload:/a\\  - 'DOMAIN-SUFFIX,$d'" "$RULES"
         added=$((added+1))
     done < "$tmp"
@@ -307,12 +311,12 @@ function BulkEditMenu {
 function RemoveSiteMenu {
     local nd
     clear
-    SubTitle " УДАЛЕНИЕ ДОМЕНА "
+    FrameTitle " УДАЛЕНИЕ ДОМЕНА "
     echo ""
     local n=0 d
     while read -r d; do
         [ -z "$d" ] && continue
-        n=$((n+1)); echo -e "   ${GR}$n.${RS} $d"
+        n=$((n+1)); echo -e "   ${GY}(${BW}$n${GY})${RS} $d"
     done < <(domains_list)
     [ "$n" -eq 0 ] && echo -e "   ${RD}Список пуст${RS}"
     echo ""
@@ -324,11 +328,12 @@ function RemoveSiteMenu {
         nd=$(domains_list | sed -n "${nd}p")
         [ -z "$nd" ] && { echo -e "  ${RD}[ОШИБКА] Нет такого номера${RS}"; sleep 2; return; }
     fi
-    if ! grep -q "DOMAIN-SUFFIX,$nd'" "$RULES"; then
+    if ! grep -qF "DOMAIN-SUFFIX,$nd'" "$RULES"; then
         echo -e "  ${YL}[ВНИМАНИЕ] Домена $nd нет в списке${RS}"
         sleep 2; return
     fi
-    sed -i "/DOMAIN-SUFFIX,$nd'/d" "$RULES"
+    local nd_e; nd_e=$(sed_esc "$nd")
+    sed -i "/DOMAIN-SUFFIX,$nd_e'/d" "$RULES"
     restart_q
     echo -e "  ${GR}[Готово] Домен $nd удален, служба перезапущена${RS}"
     sleep 2
@@ -383,10 +388,10 @@ function SwitchProfile {
 }
 
 function InputKeysSlot {
-    local f="$1" label="$2" num="$3" tmp nl cmd j
+    local f="$1" num="$3" tmp first j
     while true; do
         clear
-        SubTitle " Профиль №$num — ВВОД КОНФИГУРАЦИИ "
+        FrameTitle " Профиль №$num — ВВОД КОНФИГУРАЦИИ "
         echo ""
         echo -e "  Скопируйте ${GR}весь текст${RS} со страницы ${CY}warp-generation.github.io${RS}"
         echo -e "  под кнопкой ${GR}Clash${RS} и вставьте сюда одним куском."
@@ -397,22 +402,15 @@ function InputKeysSlot {
         echo -e "  ${RD}D / Delete / Clear${RS} — очистить профиль (удалить ключи с диска)."
         echo ""
         tmp=$(mktemp)
-        cat > "$tmp" 2>/dev/null
-        if ! grep -q '[^[:space:]]' "$tmp" 2>/dev/null; then
+        read -r first
+        first=$(printf '%s' "$first" | tr -d '\r\t ' | tr '[:upper:]' '[:lower:]')
+        if [ -z "$first" ]; then
             rm -f "$tmp"
             echo -e "  ${YL}[Шаг пропущен — ключи не изменены]${RS}"
             sleep 2
             return 1
         fi
-        nl=$(wc -l < "$tmp")
-        cmd=$(head -n1 "$tmp" | tr -d '\r\t ' | tr '[:upper:]' '[:lower:]')
-        if [ "$nl" -le 2 ] && [ "$cmd" = "s" ]; then
-            rm -f "$tmp"
-            echo -e "  ${YL}[Шаг пропущен — ключи не изменены]${RS}"
-            sleep 2
-            return 1
-        fi
-        if [ "$nl" -le 2 ] && { [ "$cmd" = "d" ] || [ "$cmd" = "delete" ] || [ "$cmd" = "clear" ]; }; then
+        if [ "$first" = "d" ] || [ "$first" = "delete" ] || [ "$first" = "clear" ]; then
             rm -f "$tmp"
             rm -f "$f"
             if [ "$(active_slot)" = "$num" ]; then
@@ -431,6 +429,8 @@ function InputKeysSlot {
             sleep 2
             return 1
         fi
+        printf '%s\n' "$first" > "$tmp"
+        cat >> "$tmp" 2>/dev/null
         tr -d '\r' < "$tmp" > "$tmp.clean"
         if ! grep -q '^proxies:' "$tmp.clean"; then
             rm -f "$tmp" "$tmp.clean" "$tmp.out"
@@ -501,26 +501,26 @@ function ProfilesMenu {
         FrameTitle " ПРОФИЛИ WARP "
         local a=$(active_slot) i pt sp pad st col
         echo ""
-        echo -e "  ${BW}Сейчас активен:${RS} ${GR}Профиль №$a${RS}"
+        echo -e "  Сейчас активен: ${GR}Профиль №$a${RS}"
         echo ""
         for i in 1 2 3 4 5; do
             if [ "$i" = "$a" ]; then
-                col="${GR}Выбран профиль №$i${RS}"; pt="Выбран профиль №$i"
-                st="${GR}[ АКТИВЕН ]${RS}"; stt="[ АКТИВЕН ]"
+                col=$GR; pt="Выбран профиль №$i"
+                st="${GR}[ АКТИВЕН ]${RS}"
             elif is_filled "$CONF/warp_${i}.yaml"; then
-                col="${WT}Выбрать профиль №$i${RS}"; pt="Выбрать профиль №$i"
-                st="${GR}[ ГОТОВ ]${RS}"; stt="[ ГОТОВ ]"
+                col=$WT; pt="Выбрать профиль №$i"
+                st="${GR}[ ГОТОВ ]${RS}"
             else
-                col="${WT}Выбрать профиль №$i${RS}"; pt="Выбрать профиль №$i"
-                st="${RD}[ ПУСТ ]${RS}"; stt="[ ПУСТ ]"
+                col=$WT; pt="Выбрать профиль №$i"
+                st="${RD}[ ПУСТ ]${RS}"
             fi
-            pad=$(( 46 - 7 - $(charlen "$pt") - $(charlen "$stt") )); [ "$pad" -lt 1 ] && pad=1
+            pad=$(( 36 - 5 - $(charlen "$pt") )); [ "$pad" -lt 1 ] && pad=1
             sp=$(printf '%*s' "$pad" '')
-            echo -e "  ${GY}(${BW}${i}${GY})${RS} ${col}${st}${sp}${GY}|${RS}  ${GY}(${BW}${i}${i}${GY})${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
+            echo -e "  ${GY}(${BW}$i${GY})${RS} ${col}${pt}${RS}${st}${sp}${GY}|${RS}  ${GY}(${BW}$i$i${GY})${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
         done
         echo ""
         echo -e "  ${GY}(${BW}0${GY})${RS} ${WT}Назад (или Enter)${RS}"
-        echo -e "  ${GY}(${BW}C${GY})${RS} ${RD}Удалить ключи для всех профилей${RS}"
+        echo -e "                              ${GY}(${BW}C${GY})${RS} ${RD}Удалить ключи для всех профилей${RS}"
         echo ""
         local c; c=$(get_act)
         case "$c" in
@@ -744,7 +744,7 @@ function get_geo_line {
         fi
     fi
     local resp ip cc isp
-    resp=$(curl -4 -s --connect-timeout 3 --max-time 6 "http://ip-api.com/json/?fields=query,country,isp&lang=ru")
+    resp=$(curl -4 -s --connect-timeout 3 --max-time 6 "http://ip-api.com/json/?fields=query,country,isp")
     ip=$(printf '%s' "$resp" | grep -o '"query":"[^"]*"' | cut -d'"' -f4)
     cc=$(printf '%s' "$resp" | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
     isp=$(printf '%s' "$resp" | grep -o '"isp":"[^"]*"' | cut -d'"' -f4)
@@ -755,6 +755,17 @@ function get_geo_line {
         line=$(printf '%s\t-' "Не определено")
     fi
     printf '%s' "$line"
+}
+
+function menu_item {
+    local n="$1" t="$2" s="$3"
+    if [ -z "$s" ]; then
+        echo -e "  ${GY}(${BW}$n${GY})${RS} ${WT}$t${RS}"
+        return
+    fi
+    local pad=$(( 57 - 7 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
+    local sp=$(printf '%*s' "$pad" '')
+    echo -e "  ${GY}(${BW}$n${GY})${RS} ${WT}$t${RS}${sp}${WT}$s${RS}"
 }
 
 function Menu {
@@ -789,15 +800,15 @@ function Menu {
     echo -e " ${GY}${div}${RS}"
     echo ""
     if [ "$geo_info" = "-" ]; then
-        echo -e "  ${BW}Внешний IP:${RS} ${YL}Не определено${RS}"
+        echo -e "  ${BW}Внешний IP: ${YL}Не определено${RS}"
     else
-        echo -e "  ${BW}Внешний IP:${RS} ${YL}${geo_ip}${RS} ${GY}(${geo_info})${RS}"
+        echo -e "  ${BW}Внешний IP: ${YL}${geo_ip}${RS} ${GY}(${geo_info})${RS}"
     fi
     if [ "$err_count" -gt 0 ]; then
-        echo -e "  ${BW}Шлюз связи:${RS} ${RD}НЕДОСТУПЕН${RS} ${GY}(сбоев: ${err_count}, последний: ${last_err})${RS}"
+        echo -e "  ${BW}Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${GY}(сбоев: ${err_count}, последний: ${last_err})${RS}"
         echo -e "              ${YL}Для повторной проверки нажмите клавишу T${RS}"
     else
-        echo -e "  ${BW}Шлюз связи:${RS} ${GR}ДОСТУПЕН${RS} ${GY}(сбоев: 0)${RS}"
+        echo -e "  ${BW}Шлюз связи: ${GR}ДОСТУПЕН${RS} ${GY}(сбоев: 0)${RS}"
     fi
     echo ""
 
@@ -835,16 +846,6 @@ function Menu {
 }
 
 
-function menu_item {
-    local n="$1" t="$2" s="$3"
-    if [ -z "$s" ]; then
-        echo -e "  ${GY}(${BW}${n}${GY})${RS} ${WT}${t}${RS}"
-        return
-    fi
-    local pad=$(( 57 - 7 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
-    local sp=$(printf '%*s' "$pad" '')
-    echo -e "  ${GY}(${BW}${n}${GY})${RS} ${WT}${t}${RS}${sp}${s}"
-}
 
 if [ "$#" -gt 0 ]; then
     case "$1" in
@@ -860,6 +861,7 @@ if [ "$#" -gt 0 ]; then
             new_d=$(echo "$2" | tr -d ' ')
             if [ ! -f "$RULES" ]; then echo "payload:" > "$RULES"; fi
             if domains_list | grep -qx "$new_d"; then echo "Уже есть в списке."; exit 0; fi
+            grep -q '^payload:' "$RULES" 2>/dev/null || printf 'payload:\n' > "$RULES"
             sed -i "/^payload:/a\\  - 'DOMAIN-SUFFIX,$new_d'" "$RULES"
             restart_q
             echo "Домен $new_d добавлен и применен."
@@ -867,8 +869,9 @@ if [ "$#" -gt 0 ]; then
         --remove)
             if [ -z "$2" ]; then echo "Укажите домен!"; exit 1; fi
             new_d=$(echo "$2" | tr -d ' ')
-            if ! grep -q "DOMAIN-SUFFIX,$new_d'" "$RULES"; then echo "Домена нет в списке."; exit 0; fi
-            sed -i "/DOMAIN-SUFFIX,$new_d'/d" "$RULES"
+            if ! grep -qF "DOMAIN-SUFFIX,$new_d'" "$RULES"; then echo "Домена нет в списке."; exit 0; fi
+            new_e=$(sed_esc "$new_d")
+            sed -i "/DOMAIN-SUFFIX,$new_e'/d" "$RULES"
             restart_q
             echo "Домен $new_d удален и применен."
             exit 0 ;;
@@ -919,12 +922,12 @@ while true; do
         4) RemoveSiteMenu ;;
         5) ProfilesMenu ;;
         6) ToggleMode ;;
-        7|8|9|s|S) SettingsMenu ;;
-        10|t|T) FullCheckMenu ;;
+        7) SettingsMenu ;;
+        t|T) FullCheckMenu ;;
         h|H) HelpScreen ;;
         u|U) RunUpdateCore ;;
         l|L) LogsScreen ;;
-        0|q|Q|e|E|"") clear; exit 0 ;;
+        e|E|"") clear; exit 0 ;;
         *) echo -e "  ${RD}[ОШИБКА] Неверный ввод — повторите${RS}"; sleep 1 ;;
     esac
 done
