@@ -171,15 +171,15 @@ function install_informer {
 # Информер MihomoUtil (создается утилитой mihomoutil)
 if [ -t 1 ] && [ -n "$PS1" ]; then
   if systemctl is-active --quiet mihomo; then
-    s="РАБОТАЕТ"; mc="\033[92m"
+    s="работает"; mc="\033[92m"
   else
-    s="ОСТАНОВЛЕН"; mc="\033[91m"
+    s="остановлен"; mc="\033[91m"
   fi
-  m="По списку сайтов"
+  m="по списку сайтов"
   if [ "$(grep '^mode:' /etc/mihomo/config.yaml 2>/dev/null | awk '{print $2}')" = "global" ]; then
-    m="Глобальный (весь трафик)"
+    m="весь трафик"
   fi
-  printf "\033[36mMihomo:\033[0m VPN-туннель ${mc}%s\033[0m | Режим: %s | Панель: \033[4;36mmihomoutil\033[0m\n" "$s" "$m"
+  printf "\033[1;36m[Mihomo]\033[0m\033[0;90m ->\033[0m \033[1;37mVPN-туннель:\033[0m ${mc}%s\033[0m \033[0;90m|\033[0m \033[0;36mОбход:\033[0m \033[1;36m%s\033[0m \033[0;90m|\033[0m \033[0;36mУправление:\033[0m \033[4;36mmihomoutil\033[0m\n" "$s" "$m"
 fi
 EOF_INFO
 }
