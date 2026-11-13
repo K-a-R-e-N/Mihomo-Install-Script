@@ -4,13 +4,13 @@
 #   Ставится установщиком Mihomo-setup.sh. Обновление: mihomoutil --update
 # ==============================================================================
 # === START_OF_UTIL ===
-CY=$'\033[96m'
-GR=$'\033[92m'
-YL=$'\033[93m'
-RD=$'\033[91m'
-DM=$'\033[90m'
+CY=$'\033[1;36m'
+GR=$'\033[1;32m'
+YL=$'\033[1;33m'
+RD=$'\033[1;31m'
+DM=$'\033[0;90m'
 RS=$'\033[0m'
-BG=$'\033[30;47m'
+BG=$'\033[1;38;5;16;107m'
 # Цвета главного меню (по образцу): WT — белый, BW — жирно-белый, GY — серый,
 # HDR — чёрный текст на ярко-белом (плашки секций)
 WT=$'\033[0;37m'
@@ -235,7 +235,7 @@ function ViewSites {
     while read -r d; do
         [ -z "$d" ] && continue
         n=$((n+1))
-        echo -e "   ${GR}$n.${RS} $d"
+        echo -e "   ${GY}(${BW}${n}${GY})${RS} ${WT}${d}${RS}"
     done < <(domains_list)
     [ "$n" -eq 0 ] && echo -e "   ${RD}Список пуст${RS}"
     echo ""
@@ -312,7 +312,7 @@ function RemoveSiteMenu {
     local n=0 d
     while read -r d; do
         [ -z "$d" ] && continue
-        n=$((n+1)); echo -e "   ${GR}$n.${RS} $d"
+        n=$((n+1)); echo -e "   ${GY}(${BW}${n}${GY})${RS} ${WT}${d}${RS}"
     done < <(domains_list)
     [ "$n" -eq 0 ] && echo -e "   ${RD}Список пуст${RS}"
     echo ""
@@ -501,29 +501,29 @@ function ProfilesMenu {
         FrameTitle " ПРОФИЛИ WARP "
         local a=$(active_slot) i pt sp pad st col
         echo ""
-        echo -e "  Сейчас активен: ${GR}Профиль №$a${RS}"
+        echo -e "  ${BW}Сейчас активен: ${GR}Профиль №$a${RS}"
         echo ""
         for i in 1 2 3 4 5; do
             if [ "$i" = "$a" ]; then
-                col="${GR}$i. Выбран профиль №$i${RS}"
-                pt="$i. Выбран профиль №$i"
+                col="${GY}(${BW}${i}${GY})${RS} ${GR}Выбран профиль №${i}${RS}"
+                pt="Выбран профиль №$i"
                 st="${GR}[ АКТИВЕН ]${RS}"; stt="[ АКТИВЕН ]"
             elif is_filled "$CONF/warp_${i}.yaml"; then
-                col="${CY}$i.${RS} Выбрать профиль №$i"
-                pt="$i. Выбрать профиль №$i"
+                col="${GY}(${BW}${i}${GY})${RS} ${WT}Выбрать профиль №${i}${RS}"
+                pt="Выбрать профиль №$i"
                 st="${GR}[ ГОТОВ ]${RS}"; stt="[ ГОТОВ ]"
             else
-                col="${CY}$i.${RS} Выбрать профиль №$i"
-                pt="$i. Выбрать профиль №$i"
+                col="${GY}(${BW}${i}${GY})${RS} ${WT}Выбрать профиль №${i}${RS}"
+                pt="Выбрать профиль №$i"
                 st="${RD}[ ПУСТ ]${RS}"; stt="[ ПУСТ ]"
             fi
-            pad=$(( 36 - $(charlen "$pt") - $(charlen "$stt") )); [ "$pad" -lt 1 ] && pad=1
+            pad=$(( 40 - 6 - $(charlen "$pt") - $(charlen "$stt") )); [ "$pad" -lt 2 ] && pad=2
             sp=$(printf '%*s' "$pad" '')
-            echo -e "  ${col}${st}${sp}|  ${YL}$i$i.${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
+            echo -e "  ${col}${st}${sp}${GY}|${RS}  ${GY}(${BW}${i}${i}${GY})${RS} ${YL}Изменить${RS} / ${RD}Удалить${RS}"
         done
         echo ""
-        echo -e "  ${CY}0. Назад${RS} (или Enter)"
-        echo -e "                              ${RD}[ ${CY}C.${RS} ${RD}Удалить ключи для всех профилей ]${RS}"
+        echo -e "  ${GY}(${BW}0${GY})${RS} ${WT}Назад (или Enter)${RS}"
+        echo -e "                              ${RD}[ ${BW}C${RS} ${RD}Удалить ключи для всех профилей ]${RS}"
         echo ""
         local c; c=$(get_act)
         case "$c" in
@@ -792,16 +792,15 @@ function Menu {
     echo -e " ${GY}${div}${RS}"
     echo ""
     if [ "$geo_info" = "-" ]; then
-        echo -e "  ${WT}Внешний IP: ${YL}Не определено${RS}"
+        echo -e "  ${BW}Внешний IP: ${YL}Не определено${RS}"
     else
-        echo -e "  ${WT}Внешний IP: ${BW}${geo_ip}${RS} ${WT}(${geo_info})${RS}"
+        echo -e "  ${BW}Внешний IP: ${YL}${geo_ip}${RS} ${GY}(${geo_info})${RS}"
     fi
-    echo ""
     if [ "$err_count" -gt 0 ]; then
-        echo -e "  ${WT}Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${WT}(сбоев: ${err_count}, последний: ${last_err})${RS}"
+        echo -e "  ${BW}Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${GY}(сбоев: ${err_count}, последний: ${last_err})${RS}"
         echo -e "              ${YL}Для повторной проверки нажмите клавишу T${RS}"
     else
-        echo -e "  ${WT}Шлюз связи: ${GR}ДОСТУПЕН${RS} ${WT}(сбоев: 0)${RS}"
+        echo -e "  ${BW}Шлюз связи: ${GR}ДОСТУПЕН${RS} ${GY}(сбоев: 0)${RS}"
     fi
     echo ""
 
@@ -826,14 +825,14 @@ function Menu {
     echo -e "  ${HDR}${sec2}${RS}${BW}${fill}${RS}"
     local d5="Профили с конфигурациями WARP"
     pad=$(( 57 - 7 - $(charlen "$d5") )); [ "$pad" -lt 1 ] && pad=1
-    echo -e "  ${GY}(${BW}5${GY})${RS} ${WT}${d5}${RS}$(printf '%*s' "$pad" '')${WT}[ ${mode_col:-$CY}Выбран: №${prof}${RS} ${WT}]${RS}"
+    echo -e "  ${GY}(${BW}5${GY})${RS} ${WT}${d5}${RS}$(printf '%*s' "$pad" '')${WT}[ ${CY}Выбран: №${prof}${RS} ${WT}]${RS}"
     local d6="Режим обхода"
     pad=$(( 57 - 7 - $(charlen "$d6") )); [ "$pad" -lt 1 ] && pad=1
     echo -e "  ${GY}(${BW}6${GY})${RS} ${WT}${d6}${RS}$(printf '%*s' "$pad" '')${WT}[ ${mode_col}${mode_txt}${RS} ${WT}]${RS}"
     echo -e "  ${GY}(${BW}S${GY})${RS} ${WT}Настройки (туннель, автозапуск, SSH-информер)${RS}"
     echo ""
     echo -e " ${GY}${div}${RS}"
-    echo -e " ${GY}(${BW}E${GY})${WT},${GY}(${BW}Enter${GY})${WT}-${RD}Выход${RS}  ${GY}│${RS}  ${GY}(${BW}T${GY})${WT}-${GR}Тест сети${RS}  ${GY}(${BW}L${GY})${WT}-Логи  ${GY}(${BW}U${GY})${WT}-Обновление  ${GY}(${BW}H${GY})${WT}-Справка${RS}"
+    echo -e " ${GY}[${BW}E${GY}]${WT},${GY}[${BW}Enter${GY}]${WT}-${RD}Выход${RS}      ${GY}[${BW}T${GY}]${WT}-${GR}Тест сети${RS}   ${GY}[${BW}L${GY}]${WT}-Логи   ${GY}[${BW}U${GY}]${WT}-Обновление   ${GY}[${BW}H${GY}]${WT}-Справка${RS}"
     echo -e " ${GY}${div}${RS}"
     echo ""
 }
@@ -842,12 +841,12 @@ function Menu {
 function menu_item {
     local n="$1" t="$2" s="$3"
     if [ -z "$s" ]; then
-        echo -e "  ${CY}${n}.${RS} ${t}"
+        echo -e "  ${GY}(${BW}${n}${GY})${RS} ${WT}${t}${RS}"
         return
     fi
-    local pad=$(( 52 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
+    local pad=$(( 57 - 7 - $(charlen "$t") )); [ "$pad" -lt 1 ] && pad=1
     local sp=$(printf '%*s' "$pad" '')
-    echo -e "  ${CY}${n}.${RS} ${t}${sp}${s}"
+    echo -e "  ${GY}(${BW}${n}${GY})${RS} ${WT}${t}${RS}${sp}${s}"
 }
 
 if [ "$#" -gt 0 ]; then
