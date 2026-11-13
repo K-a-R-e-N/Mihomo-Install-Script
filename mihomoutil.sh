@@ -11,6 +11,12 @@ RD=$'\033[91m'
 DM=$'\033[90m'
 RS=$'\033[0m'
 BG=$'\033[30;47m'
+# Цвета главного меню (по образцу): WT — белый, BW — жирно-белый, GY — серый,
+# HDR — чёрный текст на ярко-белом (плашки секций)
+WT=$'\033[0;37m'
+BW=$'\033[1;37m'
+GY=$'\033[0;90m'
+HDR=$'\033[1;38;5;16;107m'
 
 REPO_UTIL="https://raw.githubusercontent.com/K-a-R-e-N/Mihomo-Install-Script/main/mihomoutil.sh"
 REPO_API="https://api.github.com/repos/K-a-R-e-N/Mihomo-Install-Script/commits?path=mihomoutil.sh&per_page=1"
@@ -120,7 +126,7 @@ function domains_list {
 function restart_q { systemctl restart mihomo > /dev/null 2>&1; }
 function get_act {
     local _a
-    read -rp "  Действие: " _a
+    read -rp "  ${BW}Действие:${RS} " _a
     _a=$(RU2EN "$_a")
     printf '%s' "$_a"
 }
@@ -728,57 +734,110 @@ function RunUpdateCore {
     pause
 }
 
+GEO_CACHE=/tmp/mihomo_geo.txt
+
+# --- Внешний IP с кэшем на 10 минут, чтобы перерисовка меню не тормозила ---
+function get_geo_line {
+    local line
+    if [ -f "$GEO_CACHE" ]; then
+        local age=$(( $(date +%s) - $(stat -c %Y "$GEO_CACHE" 2>/dev/null || echo 0) ))
+        if [ "$age" -lt 600 ]; then
+            line=$(cat "$GEO_CACHE" 2>/dev/null)
+            if [ -n "$line" ]; then printf '%s' "$line"; return; fi
+        fi
+    fi
+    local resp ip cc isp
+    resp=$(curl -4 -s --connect-timeout 3 --max-time 6 "http://ip-api.com/json/?fields=query,countryCode,isp")
+    ip=$(printf '%s' "$resp" | grep -o '"query":"[^"]*"' | cut -d'"' -f4)
+    cc=$(printf '%s' "$resp" | grep -o '"countryCode":"[^"]*"' | cut -d'"' -f4)
+    isp=$(printf '%s' "$resp" | grep -o '"isp":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$ip" ]; then
+        line=$(printf '%s\t%s, %s' "$ip" "$cc" "$isp")
+        printf '%s' "$line" > "$GEO_CACHE" 2>/dev/null
+    else
+        line=$(printf '%s\t-' "Не определено")
+    fi
+    printf '%s' "$line"
+}
+
 function Menu {
     clear
     FrameTitle " ПАНЕЛЬ УПРАВЛЕНИЯ И АВТОМАТИЗАЦИИ MIHOMOUTIL "
+    echo ""
     local mode_str=$(grep "^mode:" "$CFGS" 2>/dev/null | awk '{print $2}')
     local prof=$(active_slot)
     local err_count=$(cat "$ERR_COUNT_FILE" 2>/dev/null || echo "0")
     local last_err=$(cat "$LAST_ERR_FILE" 2>/dev/null || echo "Ошибок нет")
     local n_dom=$(domains_list | grep -c .)
+    local geo=$(get_geo_line)
+    local geo_ip geo_info
+    geo_ip=$(printf '%s' "$geo" | cut -f1)
+    geo_info=$(printf '%s' "$geo" | cut -f2)
     local ssh_txt ssh_col
     if [ -f "$INFORMER" ]; then ssh_txt="Вкл"; ssh_col=$GR; else ssh_txt="Выкл"; ssh_col=$YL; fi
 
     local st_txt st_col au_txt au_col mode_txt mode_col
-    if svc_on; then st_txt="Запущен"; st_col=$GR; else st_txt="Остановлен"; st_col=$YL; fi
+    if svc_on; then st_txt="Запущен"; st_col=$GR; else st_txt="Остановлен"; st_col=$RD; fi
     if auto_on; then au_txt="Вкл"; au_col=$GR; else au_txt="Выкл"; au_col=$YL; fi
     if [ "$mode_str" = "global" ]; then
         mode_txt="Глобальный режим"; mode_col=$YL
     else
-        mode_txt="По списку сайтов"; mode_col=$GR
+        mode_txt="По списку сайтов"; mode_col=$CY
     fi
 
+    local div fill
+    div=$(printf '%.0s─' $(seq 1 78))
+    echo -e " ${GY}${div}${RS}"
+    echo -e "  ${WT}Статус Mihomo: ${st_col}${st_txt}${RS} ${GY}|${RS} ${WT}Автозапуск: ${au_col}${au_txt}${RS} ${GY}|${RS} ${WT}Инфо-строка по SSH: ${ssh_col}${ssh_txt}${RS}"
+    echo -e " ${GY}${div}${RS}"
     echo ""
-    echo -e "  Статус Mihomo: ${st_col}${st_txt}${RS} | Автозапуск: ${au_col}${au_txt}${RS} | Инфо-строка по SSH: ${ssh_col}${ssh_txt}${RS}"
-    echo -e "  Текущий профиль: ${GR}№${prof}${RS} | Режим обхода: ${mode_col}${mode_txt}${RS}"
+    if [ "$geo_info" = "-" ]; then
+        echo -e "  ${WT}Внешний IP: ${YL}Не определено${RS}"
+    else
+        echo -e "  ${WT}Внешний IP: ${BW}${geo_ip}${RS} ${WT}(${geo_info})${RS}"
+    fi
+    echo ""
     if [ "$err_count" -gt 0 ]; then
-        echo -e "  Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${DM}(сбоев: $err_count, последний: $last_err)${RS}"
-        echo -e "              ${YL}Для проверки доступности нажмите клавишу T${RS}"
+        echo -e "  ${WT}Шлюз связи: ${RD}НЕДОСТУПЕН${RS} ${WT}(сбоев: ${err_count}, последний: ${last_err})${RS}"
+        echo -e "              ${YL}Для повторной проверки нажмите клавишу T${RS}"
     else
-        echo -e "  Шлюз связи: ${GR}ДОСТУПЕН — сбоев не обнаружено${RS}"
+        echo -e "  ${WT}Шлюз связи: ${GR}ДОСТУПЕН${RS} ${WT}(сбоев: 0)${RS}"
     fi
-
     echo ""
-    echo -e "  ${BG}[ МАРШРУТИЗАЦИЯ И ОБХОД БЛОКИРОВОК ]${RS}"
-    if [ "$n_dom" -gt 0 ]; then
-        menu_item 1 "Список сайтов для обхода" "${GR}[ Всего: $n_dom ]${RS}"
-    else
-        menu_item 1 "Список сайтов для обхода" "${RD}[ список пуст ]${RS}"
-    fi
-    menu_item 2 "Добавить один домен в список" ""
-    menu_item 3 "Добавить несколько доменов в список" ""
-    menu_item 4 "Удалить из списка домен" ""
 
-    echo ""
-    echo -e "  ${BG}[ УПРАВЛЕНИЕ ТРАФИКОМ И СИСТЕМОЙ ]${RS}"
-    menu_item 5 "Управление профилями WARP" "${GR}[ Выбран профиль: №${prof} ]${RS}"
-    menu_item 6 "Режим обхода" "${mode_col}[ ${mode_txt} ]${RS}"
-    menu_item S "Настройки (туннель, автозапуск, SSH-информер)" ""
+    # Секции: плашка ■ на белом фоне + подчёркивание до 79-й колонки
+    local sec1=" ■ МАРШРУТИЗАЦИЯ И ОБХОД БЛОКИРОВОК "
+    local sec2=" ■ УПРАВЛЕНИЕ ТРАФИКОМ И СИСТЕМОЙ "
+    fill=$(printf '%*s' $(( 79 - 2 - $(charlen "$sec1") )) '' | tr ' ' '_')
+    echo -e "  ${HDR}${sec1}${RS}${BW}${fill}${RS}"
 
+    # Пункты: значения прижаты к 57-й колонке, как в образце
+    local pad
+    local d1="Список сайтов в обходе"
+    local v1
+    if [ "$n_dom" -gt 0 ]; then v1="[ ${CY}Доменов: ${n_dom}${RS} ${WT}]"; else v1="[ ${RD}список пуст${RS} ${WT}]"; fi
+    pad=$(( 57 - 7 - $(charlen "$d1") )); [ "$pad" -lt 1 ] && pad=1
+    echo -e "  ${GY}(${BW}1${GY})${RS} ${WT}${d1}${RS}$(printf '%*s' "$pad" '')${WT}${v1}${RS}"
+    echo -e "  ${GY}(${BW}2${GY})${RS} ${WT}Добавить один домен${RS}"
+    echo -e "  ${GY}(${BW}3${GY})${RS} ${WT}Добавить домены списком${RS}"
+    echo -e "  ${GY}(${BW}4${GY})${RS} ${WT}Удалить домены${RS}"
     echo ""
-    echo -e "  ${CY}[E],[Enter]${RS}-${RD}Выход${RS}      ${CY}[T]${RS}-Тест сети  ${CY}[L]${RS}-Логи  ${CY}[U]${RS}-Обновление  ${CY}[H]${RS}-Справка"
+    fill=$(printf '%*s' $(( 79 - 2 - $(charlen "$sec2") )) '' | tr ' ' '_')
+    echo -e "  ${HDR}${sec2}${RS}${BW}${fill}${RS}"
+    local d5="Профили с конфигурациями WARP"
+    pad=$(( 57 - 7 - $(charlen "$d5") )); [ "$pad" -lt 1 ] && pad=1
+    echo -e "  ${GY}(${BW}5${GY})${RS} ${WT}${d5}${RS}$(printf '%*s' "$pad" '')${WT}[ ${mode_col:-$CY}Выбран: №${prof}${RS} ${WT}]${RS}"
+    local d6="Режим обхода"
+    pad=$(( 57 - 7 - $(charlen "$d6") )); [ "$pad" -lt 1 ] && pad=1
+    echo -e "  ${GY}(${BW}6${GY})${RS} ${WT}${d6}${RS}$(printf '%*s' "$pad" '')${WT}[ ${mode_col}${mode_txt}${RS} ${WT}]${RS}"
+    echo -e "  ${GY}(${BW}S${GY})${RS} ${WT}Настройки (туннель, автозапуск, SSH-информер)${RS}"
+    echo ""
+    echo -e " ${GY}${div}${RS}"
+    echo -e " ${GY}(${BW}E${GY})${WT},${GY}(${BW}Enter${GY})${WT}-${RD}Выход${RS}  ${GY}│${RS}  ${GY}(${BW}T${GY})${WT}-${GR}Тест сети${RS}  ${GY}(${BW}L${GY})${WT}-Логи  ${GY}(${BW}U${GY})${WT}-Обновление  ${GY}(${BW}H${GY})${WT}-Справка${RS}"
+    echo -e " ${GY}${div}${RS}"
     echo ""
 }
+
 
 function menu_item {
     local n="$1" t="$2" s="$3"
