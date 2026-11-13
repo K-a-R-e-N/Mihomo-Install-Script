@@ -369,15 +369,15 @@ sudo tee /etc/profile.d/mihomoutil_motd.sh > /dev/null << 'EOF_INFO'
 # Информер MihomoUtil (создается установщиком Mihomo-setup.sh)
 if [ -t 1 ] && [ -n "$PS1" ]; then
   if systemctl is-active --quiet mihomo; then
-    s="РАБОТАЕТ"; mc="\033[92m"
+    s="работает"; mc="\033[92m"
   else
-    s="ОСТАНОВЛЕН"; mc="\033[91m"
+    s="остановлен"; mc="\033[91m"
   fi
-  m="По списку сайтов"
+  m="обход по списку сайтов"
   if [ "$(grep '^mode:' /etc/mihomo/config.yaml 2>/dev/null | awk '{print $2}')" = "global" ]; then
-    m="Глобальный (весь трафик)"
+    m="весь трафик через туннель"
   fi
-  printf "\033[36mMihomo:\033[0m VPN-туннель ${mc}%s\033[0m | Режим: %s | Панель: \033[4;36mmihomoutil\033[0m\n" "$s" "$m"
+  printf "\033[1;36m[Mihomo]\033[0m\n \033[1;37mVPN-туннель:\033[0m ${mc}%s\033[0m\033[0;90m,\033[0m \033[1;36m%s\033[0m \033[0;90m|\033[0m \033[0;36mУправление:\033[0m \033[4;36mmihomoutil\033[0m\n" "$s" "$m"
 fi
 EOF_INFO
 sudo chmod +x /etc/profile.d/mihomoutil_motd.sh
@@ -496,7 +496,6 @@ if [ "$HAS_KEYS" != true ]; then
     echo ""
 else
     SurveyTop "ОПРОС ЗАБЛОКИРОВАННЫХ САЙТОВ НА ДОСТУПНОСТЬ"
-    echo ""
     FAILS=0
     TOTAL=0
     while read -r d; do
@@ -520,13 +519,11 @@ else
     else
         echo -e "      ${green}Доступных сайтов из списка всего: $TOTAL${reset}"
     fi
-    echo ""
     SurveyBottom
 fi
 
 echo ""
 InfoTop "ПОЛЕЗНАЯ ИНФОРМАЦИЯ"
-echo ""
 WARP_TXT="Не импортирован"; WARP_COL=$yellow
 if [ "$HAS_KEYS" = true ]; then WARP_TXT="Импортирован"; WARP_COL=$green; fi
 if [ "$START_MODE" = "global" ]; then MODE_TEXT="Глобальный режим"; else MODE_TEXT="По списку сайтов"; fi
@@ -549,7 +546,6 @@ info_line "Локация / Сеть:"  "$GEO_LINE"
 info_line "Режим обхода:"    "${green}${MODE_TEXT}${reset}"
 info_line "Конфиг WARP:"     "${WARP_COL}${WARP_TXT}${reset}"
 info_line "Запуск утилиты:"  "${green}mihomoutil${reset}  ${dim}(запуск из любого места)${reset}"
-echo ""
 InfoBottom
 echo ""
 echo -e "  ${cyan}══════════${reset}"
